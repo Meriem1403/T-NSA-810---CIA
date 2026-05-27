@@ -1,0 +1,47 @@
+# Secrets et clés (ne jamais commiter)
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+!**/certs/README.md
+.env
+.env.*
+!.env.example
+secrets/
+**/vault_pass.txt
+*.ovpn
+
+# Ansible
+*.retry
+.vault_pass
+iac/ansible/inventory/production.yml
+iac/ansible/inventory/group_vars/*/vault.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs et exports sensibles
+*.log
+exports/
+backups/

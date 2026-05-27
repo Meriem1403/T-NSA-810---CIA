@@ -1,0 +1,16 @@
+# Copier vers inventory/production.yml (non versionné ou avec vault)
+---
+all:
+  children:
+    site1:
+      hosts:
+        fw-s1:
+          ansible_host: 10.0.0.1
+        srv-s1:
+          ansible_host: 10.0.10.10
+    site2:
+      hosts:
+        fw-s2:
+          ansible_host: 10.10.0.1
+        bastion-s2:
+          ansible_host: 10.10.50.10

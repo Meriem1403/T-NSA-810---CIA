@@ -1,60 +1,65 @@
-# GitOps Kubernetes avec FluxCD
+# T-NSA-810 — CIA : Infrastructure hybride sécurisée (Proxmox)
 
-Ce dépôt contient une structure GitOps multi-environnements (`dev` et `prod`) prête pour FluxCD.
+Dépôt officiel du projet **Cloud Infrastructure Architects (CIA)** : deux sites Proxmox (on-prem + distant), interconnexion VPN, pare-feu (pfSense), IPAM (NetBox), observabilité (Elasticsearch / stack ELK), bastion, DNS et procédures de reprise.
+
+> **Note :** L’ancien squelette **Flux / Kubernetes** est conservé sous `legacy/flux-bootstrap/` à titre d’archive ou de bonus GitOps. Il ne remplace pas les livrables Proxmox/VPN/pfSense demandés par le sujet.
+
+## Objectifs (rappel du cahier des charges)
+
+| Exigence | Où c’est traité dans le dépôt |
+|----------|-------------------------------|
+| Site 1 + Site 2 Proxmox | `docs/architecture.md`, `iac/` |
+| VPN site-à-site sécurisé (OpenVPN) | `configs/openvpn/`, diagramme |
+| Pare-feu des deux côtés + kill switch | `configs/pfsense/`, `docs/drp-runbook.md` |
+| Bastion (accès distant contrôlé) | `docs/architecture.md`, démo |
+| IPAM NetBox mis à jour automatiquement | `configs/netbox/`, playbooks Ansible |
+| Centralisation journaux + observabilité (Elasticsearch) | `configs/elastic/` |
+| Site web uniquement en interne | `apps/` ou VM dédiée documentée |
+| DNS forwarding inter-sites | `docs/architecture.md` |
+| IaC + documentation reproductible | `iac/`, `docs/` |
 
 ## Arborescence
 
-- `clusters/dev`: point d'entrée Flux pour l'environnement de développement.
-- `clusters/prod`: point d'entrée Flux pour l'environnement de production.
-- `infrastructure/dev` et `infrastructure/prod`: namespaces et éléments d'infrastructure par environnement.
-- `apps/base`: base commune des applications.
-- `apps/dev` et `apps/prod`: overlays applicatifs par environnement.
-
-## Prérequis
-
-- Un cluster Kubernetes accessible avec `kubectl`.
-- Le CLI Flux installé localement.
-- Un token GitHub avec droits sur le dépôt.
-
-## Bootstrap Flux
-
-Remplace `YOUR_GITHUB_TOKEN` puis choisis l'environnement a brancher.
-
-### Bootstrap `dev`
-
-```bash
-export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
-flux bootstrap github \
-  --owner=Meriem1403 \
-  --repository=T-NSA-810---CIA \
-  --branch=main \
-  --path=clusters/dev \
-  --personal
+```text
+├── README.md                 # Ce fichier
+├── .gitignore
+├── docs/
+│   ├── architecture.md       # Schéma logique + liste des flux réseau
+│   ├── drp-runbook.md       # Reprise après sinistre + kill switch réversible
+│   ├── demo-scenarios.md    # Scénarios de démonstration soutenance
+│   ├── gantt.md             # Phases / jalons (tableau + suivi)
+│   ├── git-workflow.md      # Stratégie de branches et commits
+│   └── checklist-evaluation.md
+├── iac/
+│   ├── ansible/              # Automatisation VMs / services / sync NetBox
+│   └── terraform/            # Optionnel : Proxmox provider, etc.
+├── configs/
+│   ├── openvpn/              # Extraits de config (sans clés)
+│   ├── pfsense/              # Exports / snippets de règles
+│   ├── netbox/               # Scripts API, modèles de préfixes
+│   └── elastic/              # Pipelines, templates d’index, Filebeat
+├── apps/                     # Application / site interne (ex. nginx + contenu statique)
+└── legacy/
+    └── flux-bootstrap/       # Ancien exemple Flux + Helm (podinfo)
 ```
 
-### Bootstrap `prod`
+## Démarrage rapide pour l’équipe
 
-```bash
-export GITHUB_TOKEN=YOUR_GITHUB_TOKEN
-flux bootstrap github \
-  --owner=Meriem1403 \
-  --repository=T-NSA-810---CIA \
-  --branch=main \
-  --path=clusters/prod \
-  --personal
-```
+1. Lire `docs/architecture.md` puis compléter les adresses réelles des sites et VLANs.
+2. Suivre `docs/git-workflow.md` pour les branches et éviter tout secret dans Git.
+3. Déployer / configurer d’abord le **tunnel VPN** puis les pare-feu, puis DNS, puis services.
+4. Centraliser secrets dans un **coffre** (vault, gestionnaire, ansible-vault) — jamais en clair.
+5. Exécuter les scénarios de `docs/demo-scenarios.md` avant la revue finale.
 
-## Vérification
+## Contraintes sujet à respecter
 
-```bash
-kubectl get pods -n flux-system
-flux get sources git -A
-flux get kustomizations -A
-```
+- **Maximum 3 VMs par site** Proxmox.
+- Pile technique **maintenue par la communauté** : Proxmox VE, OpenVPN, pfSense, NetBox, Elasticsearch, etc.
 
-## Exemple inclus
+## Contribution
 
-Une application de démonstration `podinfo` est incluse:
+Voir `docs/git-workflow.md`. Messages de commits explicites, PR par fonctionnalité, pas de fichier de secrets suivis par Git.
 
-- en `dev` sur le namespace `apps-dev` avec `replicaCount: 1`
-- en `prod` sur le namespace `apps-prod` avec `replicaCount: 2`
+## Références
+
+- Cahier des charges projet : fichier `project.pdf` (fourri par la formation ou copié hors dépôt public si besoin).
