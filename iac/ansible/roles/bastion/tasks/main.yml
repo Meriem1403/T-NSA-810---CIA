@@ -1,0 +1,57 @@
+---
+- name: Paquets bastion (SSH, nginx)
+  ansible.builtin.apt:
+    name:
+      - openssh-server
+      - nginx
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Répertoire site interne
+  ansible.builtin.file:
+    path: /var/www/cia-internal
+    state: directory
+    mode: "0755"
+
+- name: Déployer page site interne
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../../apps/internal-site/index.html"
+    dest: /var/www/cia-internal/index.html
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Activer site nginx CIA
+  ansible.builtin.copy:
+    dest: /etc/nginx/sites-available/cia-internal
+    mode: "0644"
+    content: |
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          root /var/www/cia-internal;
+          index index.html;
+          server_name _;
+          location / { try_files $uri $uri/ =404; }
+      }
+  notify: Reload nginx
+
+- name: Activer site et désactiver default
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/cia-internal
+    dest: /etc/nginx/sites-enabled/cia-internal
+    state: link
+  notify: Reload nginx
+
+- name: sshd — interdire root par mot de passe (recommandé)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin prohibit-password"
+  notify: Restart sshd
+
+- name: sshd actif
+  ansible.builtin.service:
+    name: ssh
+    state: started
+    enabled: true

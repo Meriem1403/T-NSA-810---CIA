@@ -1,0 +1,23 @@
+---
+- name: Vérifier variables NetBox
+  ansible.builtin.assert:
+    that:
+      - netbox_url | length > 0
+      - netbox_token | length > 0
+    fail_msg: "Définir netbox_url et netbox_token (group_vars ou -e)"
+
+- name: Synchroniser préfixes via script Python
+  ansible.builtin.command:
+    cmd: >
+      python3 {{ playbook_dir }}/../../../configs/netbox/scripts/sync_from_inventory.py
+      --file {{ netbox_data_file }}
+      {{ '--dry-run' if netbox_sync_dry_run | default(true) else '' }}
+  environment:
+    NETBOX_URL: "{{ netbox_url }}"
+    NETBOX_TOKEN: "{{ netbox_token }}"
+  register: netbox_sync_result
+  changed_when: "'OK prefix' in netbox_sync_result.stdout"
+
+- name: Sortie sync
+  ansible.builtin.debug:
+    var: netbox_sync_result.stdout_lines

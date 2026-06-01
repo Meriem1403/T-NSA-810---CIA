@@ -1,0 +1,12 @@
+# Déployer sur bastion S2 : /etc/nginx/sites-available/cia-internal
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    root /var/www/cia-internal;
+    index index.html;
+    server_name _;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

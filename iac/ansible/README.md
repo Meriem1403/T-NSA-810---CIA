@@ -1,19 +1,33 @@
 # Ansible — infrastructure CIA
 
-Automatiser : état VMs / paquets (`openvpn`, agents Filebeat…), désync inventaire ↔ NetBox, sauf exports sensibles hors Git.
+Automatiser : bastion (nginx site interne, SSH), synchronisation NetBox, agents Filebeat (à venir).
+
+## Playbooks
+
+| Fichier | Description |
+|---------|-------------|
+| `playbooks/site.yml` | Baseline + rôle `bastion` |
+| `playbooks/netbox-sync.yml` | Sync IPAM via API (dry-run par défaut) |
 
 ## Utilisation rapide
 
 ```bash
 cd iac/ansible
-ansible-playbook playbooks/site.yml --check  # utilise inventory/example.inventory.yml par défaut
+cp inventory/example.inventory.yml inventory/production.yml
 
-# Déploiement avec inventaire local non versionné :
-ansible-playbook -i inventory/production.yml playbooks/site.yml
+ansible-playbook -i inventory/production.yml playbooks/site.yml --check
+ansible-playbook -i inventory/production.yml playbooks/site.yml --limit site2_bastion
+
+export NETBOX_URL=https://netbox.example.local NETBOX_TOKEN=...
+ansible-playbook playbooks/netbox-sync.yml -e netbox_sync_dry_run=false
 ```
 
-Ajoutez vos rôles dans `roles/` (ex. `roles/openvpn`, `roles/netbox-sync`).
+## Rôles
+
+- `common` — connectivité et inventaire
+- `bastion` — site interne + durcissement SSH
+- `netbox_sync` — script `configs/netbox/scripts/sync_from_inventory.py`
 
 ## Secrets
 
-`-e @vault.yml` avec fichiers `ansible-vault encrypt` uniquement hors dépôt ou chiffrés dans Git suivant politique enseignant.
+Variables via environnement ou `ansible-vault` — jamais de token en clair dans Git.

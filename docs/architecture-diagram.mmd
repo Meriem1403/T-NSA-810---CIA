@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph Internet
+    PUB["IP publique 78.202.114.212"]
+  end
+
+  subgraph S2["Site 2 — Remote (Proxmox-01)"]
+    BOX["Box: NAT 2222→pfSense:22, UDP 1194"]
+    PFS["VM100 pfSense<br/>WAN 192.168.102.103<br/>LAN 192.168.10.1"]
+    BAST["VM102 bastion 192.168.10.11<br/>nginx + SSH"]
+    WIN["VM101 Client 192.168.10.10"]
+    PUB --> BOX --> PFS
+    PFS --> BAST
+    PFS --> WIN
+  end
+
+  subgraph VPN["OpenVPN 10.8.0.0/24"]
+    OVPN["Serveur ~10.8.0.1"]
+  end
+
+  subgraph S1["Site 1 — On-prem"]
+    FW1["pfSense S1"]
+    LAN1["LAN 192.168.199.0/24"]
+    NB["NetBox + Elastic (prévu)"]
+    FW1 --- LAN1
+    LAN1 --- NB
+  end
+
+  PFS <-->|"UDP 1194"| OVPN
+  OVPN <-->|"tunnel"| FW1

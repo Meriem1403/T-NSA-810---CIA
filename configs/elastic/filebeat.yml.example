@@ -1,0 +1,33 @@
+# Template Filebeat — bastion S2 (sans secrets)
+# Copier vers /etc/filebeat/filebeat.yml et adapter ELASTIC_HOSTS
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/auth.log
+    fields:
+      site: site2
+      role: bastion
+    fields_under_root: true
+
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+    fields:
+      site: site2
+      role: bastion-nginx
+
+output.elasticsearch:
+  hosts: ["${ELASTIC_HOSTS:https://elastic.site1.local:9200}"]
+  username: "${ELASTIC_USER:elastic}"
+  password: "${ELASTIC_PASSWORD}"
+
+setup.kibana:
+  host: "${KIBANA_HOST:http://kibana.site1.local:5601}"
+
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~

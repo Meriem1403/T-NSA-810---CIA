@@ -1,0 +1,6 @@
+---
+# Variables globales — secrets via Ansible Vault en production
+netbox_url: "{{ lookup('env', 'NETBOX_URL') | default('', true) }}"
+netbox_token: "{{ lookup('env', 'NETBOX_TOKEN') | default('', true) }}"
+netbox_data_file: "{{ playbook_dir }}/../../../configs/netbox/sites-prefixes.example.yml"
+netbox_sync_dry_run: true
