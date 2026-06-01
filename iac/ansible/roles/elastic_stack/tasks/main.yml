@@ -1,0 +1,41 @@
+---
+- name: Répertoire déploiement Elastic
+  ansible.builtin.file:
+    path: "{{ elastic_deploy_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Copier docker-compose Elastic
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../docker/elastic/docker-compose.yml"
+    dest: "{{ elastic_deploy_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Copier .env Elastic
+  ansible.builtin.template:
+    src: elastic.env.j2
+    dest: "{{ elastic_deploy_dir }}/.env"
+    mode: "0600"
+  no_log: true
+
+- name: sysctl vm.max_map_count (Elasticsearch)
+  ansible.builtin.shell: sysctl -w vm.max_map_count=262144
+  changed_when: true
+  failed_when: false
+
+- name: Démarrer stack Elastic
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ elastic_deploy_dir }}"
+  register: elastic_up
+  changed_when: "'Started' in elastic_up.stderr or elastic_up.rc == 0"
+
+- name: Attendre cluster Elasticsearch
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ elastic_http_port | default(9200) }}/_cluster/health"
+    user: elastic
+    password: "{{ elastic_password }}"
+    force_basic_auth: true
+    status_code: 200
+  retries: 40
+  delay: 15

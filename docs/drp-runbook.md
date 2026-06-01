@@ -18,6 +18,9 @@
 
 **Objectif soutenance** : coupure + rollback en moins de **10 minutes** (chronomètre + captures).
 
+Script d’aide : [`../scripts/kill-switch-s2.sh`](../scripts/kill-switch-s2.sh) (`status` / checklist `off` / `on`).
+Guide : [`deploy-lab.md`](./deploy-lab.md) section 3.
+
 ## Kill switch réversible (générique)
 
 | Action | Lieu | Procédure (adapter) |

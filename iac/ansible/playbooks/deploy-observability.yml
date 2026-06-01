@@ -1,0 +1,8 @@
+---
+# Filebeat sur bastion S2 → Elastic S1
+- name: CIA — agent logs bastion
+  hosts: site2_bastion
+  become: true
+  roles:
+    - role: filebeat
+      tags: [filebeat, observability]
