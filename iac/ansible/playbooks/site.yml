@@ -1,8 +1,15 @@
 ---
-# Point d’entrée : découper ensuite en rôles (openvpn netbox bastion elk-agent…)
-- name: CIA baseline — exemple de collecte infos (à étendre)
+# Baseline CIA — exécuter avec inventaire production (non versionné)
+- name: CIA — baseline tous sites
   hosts: all
   gather_facts: true
-  tasks:
-    - name: Vérifier connectivité
-      ansible.builtin.ping:
+  roles:
+    - role: common
+      tags: [common]
+
+- name: CIA — bastion site 2
+  hosts: site2_bastion
+  become: true
+  roles:
+    - role: bastion
+      tags: [bastion, site2]

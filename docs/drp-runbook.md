@@ -7,7 +7,18 @@
 
 ---
 
-## Kill switch réversible
+## Kill switch réversible (Site 2 — procédure labo)
+
+| Action | Lieu | Procédure |
+|--------|------|-----------|
+| Couper inbound OpenVPN WAN | pfSense S2 `192.168.10.1` | `Firewall > Rules > WAN` — désactiver règle **UDP 1194** → Apply |
+| Vérifier coupure | Client VPN | `ping 192.168.102.11` doit échouer |
+| Couper SSH bastion public | Box + pfSense | Retirer NAT box `2222` **ou** désactiver port forward WAN→bastion |
+| Rollback | Même écrans | Réactiver règles dans l’ordre inverse ; tester VPN puis `ssh -p 2222` |
+
+**Objectif soutenance** : coupure + rollback en moins de **10 minutes** (chronomètre + captures).
+
+## Kill switch réversible (générique)
 
 | Action | Lieu | Procédure (adapter) |
 |--------|------|---------------------|

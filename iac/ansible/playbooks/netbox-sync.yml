@@ -1,0 +1,8 @@
+---
+- name: CIA — synchronisation IPAM NetBox
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - role: netbox_sync
+      tags: [netbox]

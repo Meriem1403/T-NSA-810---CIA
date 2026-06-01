@@ -1,82 +1,135 @@
-# Architecture — Hybrid Cloud CIA (two Proxmox sites)
+# Architecture — Hybrid Cloud CIA (deux sites Proxmox)
 
-Ce document doit être présent lors des revues avec un **diagramme exporté** (PNG/SVG depuis Draw.io, Excalidraw, etc.). Les valeurs ci-dessous sont des **placeholders** : remplacez par votre plan IP réel.
+Document de référence pour la soutenance. Diagramme Mermaid exportable : [`architecture-diagram.mmd`](./architecture-diagram.mmd).
 
-## Sites
+## Vue d’ensemble
 
-| Site | Rôle | Proxmox / edge | VMs (max 3) |
-|------|------|----------------|-------------|
-| **S1 — On‑prem** | Principal, utilisateurs LAN, NetBox Elastic possibles… | À compléter | VM1 pfSense ?, VM2 services ?, VM3 … |
-| **S2 — Remote** | Accès Internet, bastion, terminaison VPN | À compléter | VM1 pfSense ?, VM2 bastion ?, VM3 … |
+| Site | Rôle | État labo |
+|------|------|-----------|
+| **S1 — On‑prem** | Site principal, LAN utilisateurs, services (NetBox, Elastic, site interne S1…) | À documenter (préfixe exemple `192.168.199.0/24`) |
+| **S2 — Remote** | Site distant Internet, pfSense, bastion, VPN, clients LAN | **Déployé** (Proxmox `Proxmox-01`) |
 
-## Segmentation réseau
+## Site 2 — Remote (détail opérationnel)
 
-Visez au minimum **LAN / DMZ / Admin** (ou équivalent documenté).
+| VM ID | Nom | Rôle | IP / interface |
+|-------|-----|------|----------------|
+| 100 | FW | pfSense | WAN `192.168.102.103` · LAN `192.168.10.1/24` |
+| 101 | Client | Windows (poste interne) | `192.168.10.10` |
+| 102 | bastion-s2 | Ubuntu, nginx (site interne démo), SSH | `192.168.10.11` |
 
-- **LAN** utilisateurs / services internes
-- **DMZ** (services exposés indirectement ou inter-sites)
-- **Admin** (gestion Proxmox, consoles IPAM GUI, bastion depuis Internet avec moindre privilège)
+**Accès opérateur**
 
-## Schéma logique (Mermaid — exporter aussi en image pour la soutenance)
+| Usage | Adresse |
+|-------|---------|
+| IP publique box | `78.202.114.212` |
+| OpenVPN (UDP) | `78.202.114.212:1194` |
+| SSH bastion (via NAT box) | `ssh -p 2222 bastion@78.202.114.212` |
+| SSH bastion (via VPN → WAN pfSense) | `ssh bastion@192.168.102.103` |
+| Proxmox (VPN requis) | `https://192.168.102.11:8006` |
+| GUI pfSense (LAN/VPN) | `https://192.168.10.1` |
+
+**Segmentation S2**
+
+- **WAN** : interface vers box / Internet (`192.168.102.0/24` côté uplink)
+- **LAN** : `192.168.10.0/24` — clients + bastion + services internes
+- **VPN tunnel** : `10.8.0.0/24` (OpenVPN, serveur typ. `10.8.0.1`)
+
+## Site 1 — On‑prem (template équipe)
+
+À compléter avec vos VM réelles (max 3 par site). Exemple de routage observé via VPN :
+
+`Client VPN (10.8.0.x) → 10.8.0.1 → 192.168.199.131 → 192.168.102.11`
+
+| Élément | Valeur indicative |
+|---------|-------------------|
+| LAN S1 | `192.168.199.0/24` |
+| pfSense S1 | À renseigner |
+| NetBox / Elastic | VMs LAN S1 (non déployées sur S2 dans le périmètre actuel) |
+
+## Schéma logique
 
 ```mermaid
 flowchart TB
-  subgraph S1["Site 1 — On-prem"]
-    FW1[pfSense S1]
-    LAN1[LAN interne]
-    WEB[Site web interne]
-    LAN1 --- WEB
-    FW1 --- LAN1
+  subgraph Internet
+    PUB[78.202.114.212]
   end
 
   subgraph S2["Site 2 — Remote"]
-    FW2[pfSense S2]
-    BAST[bastion SSH]
-    VPN[OpenVPN]
-    DMZ2[DMZ services]
-    FW2 --- BAST
-    FW2 --- VPN
-    FW2 --- DMZ2
+    BOX[Box NAT 2222→103:22 · 1194 UDP]
+    PFS[pfSense VM100<br/>WAN .102.103 · LAN .10.1]
+    BAST[bastion VM102<br/>192.168.10.11]
+    WIN[Client VM101<br/>192.168.10.10]
+    NGX[nginx site interne]
+    BAST --- NGX
+    PFS --- BAST
+    PFS --- WIN
+    BOX --- PFS
   end
 
-  subgraph OBS["Observabilité"]
-    ES[(Elasticsearch)]
-    AGT[Agents logs]
+  subgraph VPN["Tunnel OpenVPN"]
+    TUN[10.8.0.0/24]
   end
 
-  FW1 <-.->|"Tunnel"| FW2
-  BAST -.->|"Jump"| DMZ2
-  AGT --> ES
+  subgraph S1["Site 1 — On-prem"]
+    FW1[pfSense S1]
+    LAN1[192.168.199.0/24]
+    FW1 --- LAN1
+  end
+
+  PUB --- BOX
+  PFS <-.->|UDP 1194| TUN
+  TUN <-.->|site-to-site| FW1
 ```
 
-## Points de contrôle (pare-feu)
+## Points de contrôle pare-feu (S2 — résumé)
 
-Pour chaque flux : **source**, **destination**, **port**, **action**, **justification**.
+Voir [`../configs/pfsense/site2-wan-rules.md`](../configs/pfsense/site2-wan-rules.md).
 
-| Flux | Règle (résumé) |
-|------|----------------|
-| Internet → S2 | Uniquement OpenVPN + bastion SSH (ports documentés) |
-| VPN → LAN autorisées | Préfixes S1 ⇄ S2 uniquement |
+| Flux | Port | Action | Justification |
+|------|------|--------|---------------|
+| Internet → WAN | UDP 1194 | Autoriser | OpenVPN site-à-site |
+| Internet → WAN | TCP 22 | Refuser (WAN direct) | SSH non exposé sur 22 public |
+| Box → WAN | TCP 2222 → 103:22 → 10.11:22 | Autoriser | Bastion administré |
+| Internet → WAN | TCP 80/443 | Refuser | Pas d’exposition web directe |
+| VPN → LAN S2 | RFC1918 S2 | Autoriser | Administration post-tunnel |
+| LAN → Internet | Étatful | Autoriser | Sortie utilisateurs |
 
-## VPN (OpenVPN)
+## DNS (S2)
 
-- Terminaison sur : pfSense (package OpenVPN), VM Debian, ou autre (à préciser)
-- Protocole / port serveur-client **identiques** (UDP 1194 fréquent)
-- Routage : préfixes LAN documentés dans `architecture` et poussés côté OpenVPN
+| Type | Nom | Cible |
+|------|-----|-------|
+| Host override | `client1.site2.local` | `192.168.10.10` |
+| Domain override | `site2.local` | forwarder `192.168.10.1` |
+
+Test : `nslookup client1.site2.local 192.168.10.1` depuis le bastion.
 
 ## Bastion
 
-- Exemple : `ssh -J bastion@IP_PUBLIQUE utilisateur@hôte_interne`
-- Logs vers Elastic
+- Compte dédié `bastion` (pas root direct depuis Internet).
+- Accès externe : **uniquement** via NAT contrôlé (port 2222) ou VPN puis SSH WAN/LAN documenté.
+- Saut vers VM interne : `ssh -J bastion@78.202.114.212:2222 user@192.168.10.10` (si SSH actif sur cible).
 
-## DNS forwarding
+## Site web interne
 
-- Décrire : qui résout quelles zones pour le site distant, via quel forwarder traversant le tunnel.
+- Service : **nginx** sur `192.168.10.11` (VM bastion).
+- Accessible depuis LAN S2 et depuis VPN ; **non** joignable en HTTP direct sur IP publique (preuve `curl` timeout).
 
 ## IPAM NetBox
 
-- Instance documentée hors secrets ; synchronisation playbook dans `configs/netbox/`.
+- Instance prévue **site S1** ; synchronisation décrite dans `configs/netbox/` et rôle Ansible `netbox_sync`.
 
 ## Observabilité
 
-- Placement cluster Elasticsearch ; collectors (Filebeat, Metricbeat) par VM critique.
+- Cluster Elasticsearch prévu **site S1**.
+- Agents Filebeat sur bastion / pfSense logs exportés — templates dans `configs/elastic/`.
+
+## Évolutivité
+
+Convention d’adressage pour un **site N** :
+
+- LAN site N : `192.168.(10+N).0/24`
+- pfSense LAN : `.1`
+- Bastion : `.11`
+- Premier client : `.10`
+
+Documenter chaque nouveau site dans NetBox avant déploiement playbook.

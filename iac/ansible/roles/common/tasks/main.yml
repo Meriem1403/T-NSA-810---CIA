@@ -1,0 +1,7 @@
+---
+- name: Vérifier connectivité Ansible
+  ansible.builtin.ping:
+
+- name: Afficher hostname et IP principale
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }} — {{ ansible_default_ipv4.address | default('n/a') }}"
