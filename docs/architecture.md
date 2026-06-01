@@ -19,6 +19,9 @@ Document de référence pour la soutenance.
 | 100 | FW | pfSense | WAN `192.168.102.103` · LAN `192.168.10.1/24` |
 | 101 | Client | Windows (poste interne) | `192.168.10.10` |
 | 102 | bastion-s2 | Ubuntu, nginx (site interne démo), SSH | `192.168.10.11` |
+| 103 | ELK-NetBox | NetBox + Elastic (Docker) — **labo actuel** | `192.168.10.12` |
+
+> **Note labo :** la VM 103 est sur le **même Proxmox** que le site distant (`Proxmox-01`), LAN `192.168.10.0/24`. L’IP cible documentaire site 1 (`192.168.199.20`) reste le modèle hybride ; en production réelle, NetBox/Elastic seraient sur le site on‑prem.
 
 **Accès opérateur**
 
@@ -29,6 +32,7 @@ Document de référence pour la soutenance.
 | SSH bastion (via NAT box) | `ssh -p 2222 bastion@78.202.114.212` |
 | SSH bastion (via VPN → WAN pfSense) | `ssh bastion@192.168.102.103` |
 | Proxmox (VPN requis) | `https://192.168.102.11:8006` |
+| NetBox / Kibana (VM 103) | `http://192.168.10.12:8080` · `:5601` |
 | GUI pfSense (LAN/VPN) | `https://192.168.10.1` |
 
 **Segmentation S2**

@@ -1,21 +1,21 @@
 ---
 # Déploie NetBox + Elastic (Docker) sur la VM services site S1
 - name: CIA — préparer hôte Docker site 1
-  hosts: site1_services
+  hosts: site1_services:site2_services
   become: true
   roles:
     - role: docker_host
       tags: [docker]
 
 - name: CIA — NetBox IPAM
-  hosts: site1_services
+  hosts: site1_services:site2_services
   become: true
   roles:
     - role: netbox_stack
       tags: [netbox]
 
 - name: CIA — Elasticsearch + Kibana
-  hosts: site1_services
+  hosts: site1_services:site2_services
   become: true
   roles:
     - role: elastic_stack
@@ -29,6 +29,6 @@
     - role: netbox_sync
       tags: [netbox, sync]
   vars:
-    netbox_url: "http://{{ hostvars[groups['site1_services'][0]]['netbox_public_url'] | default('192.168.199.20:8080') }}"
+    netbox_url: "http://{{ netbox_public_url | default('192.168.10.12:8080') }}"
     netbox_token: "{{ vault_netbox_token | default(lookup('env', 'NETBOX_TOKEN')) }}"
     netbox_sync_dry_run: false
