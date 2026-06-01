@@ -1,0 +1,4 @@
+---
+elastic_deploy_dir: /opt/cia/elastic
+elastic_http_port: 9200
+kibana_http_port: 5601

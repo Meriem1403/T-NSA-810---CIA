@@ -1,0 +1,8 @@
+---
+# Copier les secrets réels via ansible-vault ou -e @vault.yml (ne pas commiter en clair)
+netbox_db_password: "{{ vault_netbox_db_password | default('CHANGE_ME') }}"
+netbox_secret_key: "{{ vault_netbox_secret_key | default('CHANGE_ME_MIN_50_CHARS_NETBOX_SECRET_KEY_CIA_LAB') }}"
+netbox_superuser_password: "{{ vault_netbox_superuser_password | default('CHANGE_ME') }}"
+netbox_allowed_hosts: "192.168.199.20"
+netbox_public_url: "192.168.199.20:8080"
+elastic_password: "{{ vault_elastic_password | default('CHANGE_ME') }}"

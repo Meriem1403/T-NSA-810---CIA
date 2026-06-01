@@ -88,7 +88,11 @@ ansible-playbook playbooks/site.yml --check   # ping de base sur tous les hôtes
 
 Ensuite, ajouter vos rôles (OpenVPN, NetBox, agents Elastic…) et un inventaire local `inventory/production.yml` (non versionné) si besoin.
 
-### 4. Ordre recommandé de déploiement
+### 4. Déploiement labo (NetBox, Elastic, Filebeat, kill switch)
+
+Guide complet : [`docs/deploy-lab.md`](./docs/deploy-lab.md)
+
+### 5. Ordre recommandé de déploiement
 
 1. **Proxmox** : hyperviseurs + réseau (bridges, VLAN)  
 2. **pfSense** : WAN / LAN / DMZ / Admin, règles minimales  

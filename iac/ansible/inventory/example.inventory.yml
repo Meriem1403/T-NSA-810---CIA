@@ -5,16 +5,21 @@ all:
     site1:
       hosts:
         proxmox-s1:
-          ansible_host: 192.168.199.10
+          ansible_host: 192.168.199.131
         fw-s1:
           ansible_host: 192.168.199.1
+    site1_services:
+      hosts:
+        svc-s1:
+          ansible_host: 192.168.199.20
+          ansible_user: ubuntu
+          ansible_become: true
     site2:
       hosts:
         proxmox-s2:
           ansible_host: 192.168.102.11
         fw-s2:
           ansible_host: 192.168.10.1
-          ansible_connection: local  # pfSense : config via API/GUI
     site2_bastion:
       hosts:
         bastion-s2:

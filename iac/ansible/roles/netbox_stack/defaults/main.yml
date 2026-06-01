@@ -1,0 +1,3 @@
+---
+netbox_deploy_dir: /opt/cia/netbox
+netbox_http_port: 8080

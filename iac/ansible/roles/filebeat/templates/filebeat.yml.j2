@@ -1,0 +1,27 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/auth.log
+    fields:
+      site: site2
+      role: bastion
+    fields_under_root: true
+
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/access.log
+      - /var/log/nginx/error.log
+    fields:
+      site: site2
+      role: bastion-nginx
+
+output.elasticsearch:
+  hosts: ["{{ elastic_hosts }}"]
+  username: "{{ elastic_user | default('elastic') }}"
+  password: "{{ elastic_password }}"
+  ssl.verification_mode: none
+
+processors:
+  - add_host_metadata: ~

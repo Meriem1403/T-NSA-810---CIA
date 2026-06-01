@@ -18,11 +18,11 @@ flowchart TB
   end
 
   subgraph S1["Site 1 — On-prem"]
-    FW1["pfSense S1"]
+    FW1["pfSense 192.168.199.1"]
+    SVC["svc-s1 NetBox+Elastic .20"]
     LAN1["LAN 192.168.199.0/24"]
-    NB["NetBox + Elastic (prévu)"]
     FW1 --- LAN1
-    LAN1 --- NB
+    LAN1 --- SVC
   end
 
   PFS <-->|"UDP 1194"| OVPN

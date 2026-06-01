@@ -1,0 +1,33 @@
+---
+- name: Clé Elastic GPG
+  ansible.builtin.apt_key:
+    url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Dépôt Elastic 8.x
+  ansible.builtin.apt_repository:
+    repo: "deb https://artifacts.elastic.co/packages/8.x/apt stable main"
+    filename: elastic-8.x
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Installer Filebeat
+  ansible.builtin.apt:
+    name: filebeat
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Déployer configuration Filebeat
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    mode: "0644"
+  notify: Restart filebeat
+
+- name: Filebeat actif
+  ansible.builtin.service:
+    name: filebeat
+    state: started
+    enabled: true

@@ -1,12 +1,15 @@
 # Architecture — Hybrid Cloud CIA (deux sites Proxmox)
 
-Document de référence pour la soutenance. Diagramme Mermaid exportable : [`architecture-diagram.mmd`](./architecture-diagram.mmd).
+Document de référence pour la soutenance.
+
+- Diagramme PNG : [`architecture-diagram.png`](./architecture-diagram.png)
+- Source Mermaid : [`architecture-diagram.mmd`](./architecture-diagram.mmd)
 
 ## Vue d’ensemble
 
 | Site | Rôle | État labo |
 |------|------|-----------|
-| **S1 — On‑prem** | Site principal, LAN utilisateurs, services (NetBox, Elastic, site interne S1…) | À documenter (préfixe exemple `192.168.199.0/24`) |
+| **S1 — On‑prem** | Site principal, NetBox, Elastic, pfSense | **Documenté** — déploiement via [`deploy-lab.md`](./deploy-lab.md) |
 | **S2 — Remote** | Site distant Internet, pfSense, bastion, VPN, clients LAN | **Déployé** (Proxmox `Proxmox-01`) |
 
 ## Site 2 — Remote (détail opérationnel)
@@ -34,17 +37,26 @@ Document de référence pour la soutenance. Diagramme Mermaid exportable : [`arc
 - **LAN** : `192.168.10.0/24` — clients + bastion + services internes
 - **VPN tunnel** : `10.8.0.0/24` (OpenVPN, serveur typ. `10.8.0.1`)
 
-## Site 1 — On‑prem (template équipe)
+## Site 1 — On‑prem (3 VMs max)
 
-À compléter avec vos VM réelles (max 3 par site). Exemple de routage observé via VPN :
+Routage VPN observé : `Client (10.8.0.x) → 10.8.0.1 → 192.168.199.131 → 192.168.102.11`
 
-`Client VPN (10.8.0.x) → 10.8.0.1 → 192.168.199.131 → 192.168.102.11`
+| VM | Nom | Rôle | IP |
+|----|-----|------|-----|
+| — | Proxmox S1 | Hyperviseur | `192.168.199.131` |
+| 1 | fw-s1 | pfSense | `192.168.199.1` (LAN) |
+| 2 | svc-s1 | NetBox + Elastic (Docker) | `192.168.199.20` |
+| 3 | web-s1 | Site interne S1 (optionnel) | `192.168.199.30` |
 
-| Élément | Valeur indicative |
-|---------|-------------------|
-| LAN S1 | `192.168.199.0/24` |
-| pfSense S1 | À renseigner |
-| NetBox / Elastic | VMs LAN S1 (non déployées sur S2 dans le périmètre actuel) |
+**Services centralisés (svc-s1)**
+
+| Service | URL |
+|---------|-----|
+| NetBox | `http://192.168.199.20:8080` |
+| Elasticsearch | `http://192.168.199.20:9200` |
+| Kibana | `http://192.168.199.20:5601` |
+
+Déploiement : `ansible-playbook playbooks/deploy-site1.yml` (voir [`deploy-lab.md`](./deploy-lab.md)).
 
 ## Schéma logique
 
@@ -71,9 +83,11 @@ flowchart TB
   end
 
   subgraph S1["Site 1 — On-prem"]
-    FW1[pfSense S1]
-    LAN1[192.168.199.0/24]
+    FW1[pfSense 192.168.199.1]
+    SVC[svc-s1 NetBox+Elastic .20]
+    LAN1[LAN 192.168.199.0/24]
     FW1 --- LAN1
+    LAN1 --- SVC
   end
 
   PUB --- BOX
@@ -116,12 +130,16 @@ Test : `nslookup client1.site2.local 192.168.10.1` depuis le bastion.
 
 ## IPAM NetBox
 
-- Instance prévue **site S1** ; synchronisation décrite dans `configs/netbox/` et rôle Ansible `netbox_sync`.
+- Instance : **svc-s1** `192.168.199.20:8080`
+- Données : `configs/netbox/sites-prefixes.example.yml`
+- Sync : `configs/netbox/scripts/sync_from_inventory.py` + playbook `netbox-sync.yml`
 
 ## Observabilité
 
-- Cluster Elasticsearch prévu **site S1**.
-- Agents Filebeat sur bastion / pfSense logs exportés — templates dans `configs/elastic/`.
+- Stack : Docker sur **svc-s1** (`iac/docker/elastic/`)
+- Collecte : rôle Ansible `filebeat` sur bastion S2 → Elastic S1
+- Guide Kibana : `configs/elastic/kibana-guide.md`
+- Playbook : `playbooks/deploy-observability.yml`
 
 ## Évolutivité
 

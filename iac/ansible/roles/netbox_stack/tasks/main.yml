@@ -1,0 +1,33 @@
+---
+- name: Répertoire déploiement NetBox
+  ansible.builtin.file:
+    path: "{{ netbox_deploy_dir }}"
+    state: directory
+    mode: "0750"
+
+- name: Copier docker-compose NetBox
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../docker/netbox/docker-compose.yml"
+    dest: "{{ netbox_deploy_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Copier .env NetBox (fourni par vault / group_vars)
+  ansible.builtin.template:
+    src: netbox.env.j2
+    dest: "{{ netbox_deploy_dir }}/.env"
+    mode: "0600"
+  no_log: true
+
+- name: Démarrer NetBox
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ netbox_deploy_dir }}"
+  register: netbox_up
+  changed_when: netbox_up.rc == 0
+
+- name: Attendre HTTP NetBox
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ netbox_http_port | default(8080) }}/"
+    status_code: [200, 302]
+  retries: 30
+  delay: 10
