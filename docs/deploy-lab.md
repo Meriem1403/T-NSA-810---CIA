@@ -5,7 +5,7 @@ Guide pas à pas pour finaliser les critères restants sur l’infrastructure r�
 ## Prérequis
 
 - VPN connecté vers site S2 (accès `192.168.102.0/24` et `192.168.199.0/24` si routé).
-- VM **svc-s1** Ubuntu sur site 1 : `192.168.199.20` (2 vCPU, 4 Go RAM, 40 Go disque).
+- VM **svc-s1** Ubuntu sur site 1 : `192.168.199.20` (cible hybride), **ou en labo actuel** VM **103 ELK-NetBox** : `192.168.10.12` sur Proxmox-01 (2 vCPU, 4 Go RAM, 40 Go disque).
 - Ansible installé sur votre poste : `pip install ansible`.
 - Secrets dans un fichier local (non Git) : `iac/ansible/vault.yml` ou variables d’environnement.
 
