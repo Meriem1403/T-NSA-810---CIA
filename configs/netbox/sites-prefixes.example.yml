@@ -2,10 +2,10 @@
 sites:
   - name: site1-onprem
     slug: site1
-    description: Site principal on-prem
+    description: Site principal on-prem (Proxmox 02, AD mar2.local)
   - name: site2-remote
     slug: site2
-    description: Site distant Proxmox (labo)
+    description: Site distant Proxmox-01 (labo)
 
 prefixes:
   - site: site1
@@ -22,10 +22,13 @@ prefixes:
     description: WAN uplink / Proxmox management S2
   - site: site2
     prefix: 10.8.0.0/24
-    status: active
-    description: OpenVPN tunnel
+    status: deprecated
+    description: OpenVPN tunnel (legacy phase 1)
 
 ip_addresses:
+  - address: 192.168.199.1/24
+    dns_name: fw.site1.local
+    description: pfSense LAN S1
   - address: 192.168.10.1/24
     dns_name: fw.site2.local
     description: pfSense LAN S2
@@ -35,3 +38,26 @@ ip_addresses:
   - address: 192.168.10.11/24
     dns_name: bastion.site2.local
     description: VM102 bastion + nginx
+  - address: 192.168.10.15/24
+    dns_name: infraservice.mar2.local
+    description: InfraService — NetBox, Vault, Wazuh, IaC
+  - address: 192.168.102.11/24
+    dns_name: proxmox-s2.mar2.local
+    description: Proxmox 01 management
+  - address: 192.168.102.103/24
+    dns_name: pfsense-wan.site2.local
+    description: pfSense WAN S2
+
+services:
+  - name: netbox
+    dns_name: netbox.mar2.local
+    address: 192.168.10.15
+    port: 8000
+  - name: vault
+    dns_name: vault.mar2.local
+    address: 192.168.10.15
+    port: 8200
+  - name: wazuh
+    dns_name: wazuh.mar2.local
+    address: 192.168.10.15
+    port: 443

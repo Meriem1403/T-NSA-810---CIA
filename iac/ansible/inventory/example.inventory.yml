@@ -16,8 +16,8 @@ all:
           ansible_become: true
     site2_services:
       hosts:
-        elk-netbox:
-          ansible_host: 192.168.10.12
+        infraservice:
+          ansible_host: 192.168.10.15
           ansible_user: root
           ansible_become: true
     site2:

@@ -1,96 +1,148 @@
-# Déploiement labo — NetBox, Elastic, Filebeat, kill switch
+# Déploiement labo — InfraService, NetBox, Vault, Wazuh, Terraform
 
-Guide pas à pas pour finaliser les critères restants sur l’infrastructure réelle.
+Guide pas à pas aligné sur l’état du labo au **23 juin 2026** ([`status-2026-06-23.md`](./status-2026-06-23.md)).
 
 ## Prérequis
 
-- VPN connecté vers site S2 (accès `192.168.102.0/24` et `192.168.199.0/24` si routé).
-- VM **svc-s1** Ubuntu sur site 1 : `192.168.199.20` (cible hybride), **ou en labo actuel** VM **103 ELK-NetBox** : `192.168.10.12` sur Proxmox-01 (2 vCPU, 4 Go RAM, 40 Go disque).
-- Ansible installé sur votre poste : `pip install ansible`.
-- Secrets dans un fichier local (non Git) : `iac/ansible/vault.yml` ou variables d’environnement.
+- VPN IPsec connecté (accès `192.168.10.0/24` et réseaux S1 si routés).
+- Hôte **`infraservice`** : `192.168.10.15` (NetBox, Vault, Wazuh, Ansible, Terraform).
+- Accès SSH à `infraservice` depuis le bastion ou le VPN.
+- Secrets dans **HashiCorp Vault** ou fichier local `iac/ansible/vault.yml` (non Git).
 
-## 1. Site 1 — VM services (NetBox + Elastic)
+## 1. Vérifier les services sur InfraService
 
-### Créer la VM sur Proxmox S1
+```bash
+ssh user@192.168.10.15
 
-1. **Create VM** → Ubuntu Server 24.04, 2 vCPU / 4 Go RAM / 40 Go.
-2. IP statique : `192.168.199.20/24`, passerelle `192.168.199.1`.
-3. Utilisateur `ubuntu`, SSH + clé ou mot de passe.
+# NetBox
+curl -I http://192.168.10.15:8000/
 
-### Déployer avec Ansible
+# Vault (si déverrouillé)
+curl http://192.168.10.15:8200/v1/sys/health
+
+# Docker (NetBox, PostgreSQL, Valkey)
+docker ps
+```
+
+## 2. NetBox — token API et synchronisation IPAM
+
+1. UI NetBox → Admin → API tokens → Create.
+2. Stocker le token dans Vault (`infra/netbox`) ou coffre d’équipe.
+3. Lancer la sync :
+
+```bash
+export NETBOX_URL=http://192.168.10.15:8000
+export NETBOX_TOKEN=<depuis Vault>
+python3 configs/netbox/scripts/sync_from_inventory.py
+```
+
+Ou via Ansible :
 
 ```bash
 cd iac/ansible
 cp inventory/example.inventory.yml inventory/production.yml
-# Éditer ansible_user / clés SSH si besoin
-
-# Secrets (exemple)
-cat > vault.yml <<'EOF'
-vault_netbox_db_password: "..."
-vault_netbox_secret_key: "...(50+ caractères)..."
-vault_netbox_superuser_password: "..."
-vault_elastic_password: "..."
-EOF
-
-ansible-playbook -i inventory/production.yml playbooks/deploy-site1.yml -e @vault.yml
+ansible-playbook -i inventory/production.yml playbooks/netbox-sync.yml -e @vault.yml
 ```
 
-### Vérifications
+## 3. Ansible — baseline et bastion
 
 ```bash
-curl -I http://192.168.199.20:8080/
-curl -u elastic:MOT_DE_PASSE http://192.168.199.20:9200/_cluster/health
-# Kibana : http://192.168.199.20:5601
+cd iac/ansible
+ansible-playbook -i inventory/production.yml playbooks/site.yml
 ```
 
-### NetBox — token API
+Rôle `bastion` : déploie nginx + site interne sur `192.168.10.11`.
 
-1. UI NetBox → Admin → API tokens → Create.
-2. Exporter :
+## 4. Vault — intégration Ansible (AppRole)
+
+1. Vérifier le moteur KV `infra/` et la policy Ansible.
+2. Configurer AppRole (Secret ID hors Git).
+3. Tester la lecture d’un secret :
 
 ```bash
-export NETBOX_URL=http://192.168.199.20:8080
-export NETBOX_TOKEN=...
-python3 configs/netbox/scripts/sync_from_inventory.py
+ansible-playbook -i inventory/production.yml playbooks/site.yml --tags common --check
 ```
 
-## 2. Filebeat sur bastion S2
+Voir [`secrets-and-access.md`](./secrets-and-access.md).
+
+## 5. Wazuh — agents et dashboards
+
+1. Vérifier le manager Wazuh sur `infraservice`.
+2. Confirmer les agents sur bastion et hôtes supervisés.
+3. Générer un événement test :
 
 ```bash
-ansible-playbook -i inventory/production.yml playbooks/deploy-observability.yml -e @vault.yml
+ssh -p 2222 bastion@78.202.114.212 "logger 'CIA-WAZUH-TEST'"
 ```
 
-Générer un événement :
+4. Vérifier l’événement dans l’interface Wazuh (< 2 min).
+5. Finaliser dashboards et alertes pour la soutenance.
+
+> **Legacy :** le playbook `deploy-observability.yml` (Filebeat → Elastic) reste disponible pour référence ; la supervision courante utilise Wazuh.
+
+## 6. Terraform — provisionnement VM
 
 ```bash
-ssh -p 2222 bastion@78.202.114.212 "sudo logger 'CIA test log centralisation'"
+cd iac/terraform
+terraform init
+terraform validate
+terraform plan
 ```
 
-Kibana → Discover → filtre `site: site2`.
+**Blocage actuel :** créer le template Cloud-Init `ubuntu-template` sur Proxmox, puis :
 
-## 3. Kill switch (< 10 min)
+```bash
+terraform apply
+```
+
+Enchaîner avec Ansible sur la VM créée.
+
+## 7. Kill switch (< 10 min)
 
 Chronomètre + captures écran.
 
 ```bash
-./scripts/kill-switch-s2.sh status   # avant
+./scripts/kill-switch-s2.sh status
 ```
 
-1. pfSense S2 → **Firewall > Rules > WAN** → désactiver **UDP 1194** → **Apply**.
-2. Client VPN : `ping 192.168.102.11` doit **échouer**.
-3. `./scripts/kill-switch-s2.sh status`
-4. Réactiver la règle → **Apply** → ping OK.
+1. pfSense S2 → **VPN > IPsec** — désactiver tunnel ou règle WAN associée → **Apply**.
+2. Client VPN : `ping 192.168.10.15` doit **échouer**.
+3. Réactiver → **Apply** → ping OK.
+4. Documenter horodatage dans [`drp-runbook.md`](./drp-runbook.md).
 
-Documenter dans `docs/drp-runbook.md` (horodatage + captures).
+## 8. HTTPS et LDAPS (à finaliser)
 
-## 4. Diagramme soutenance
+1. Finaliser la PKI Active Directory `mar2.local`.
+2. Déployer Nginx reverse proxy sur `infraservice`.
+3. Activer HTTPS pour NetBox, Vault, Wazuh, Guacamole.
+4. Configurer LDAP/LDAPS dans NetBox et Vault.
 
-Fichier livré : [`architecture-diagram.png`](./architecture-diagram.png) (généré depuis `.mmd`).
+## 9. Sauvegardes
 
-## 5. Dépannage
+| Composant | Méthode | État |
+|-----------|---------|------|
+| Vault | Snapshots Raft automatiques | ✅ |
+| NetBox / PostgreSQL | À industrialiser | 🟡 |
+| pfSense | Export config sanitisé | Manuel |
+
+Tester une restauration complète avant la soutenance.
+
+## 10. Dépannage
 
 | Problème | Action |
 |----------|--------|
-| Elastic OOM | Augmenter RAM VM ou `ES_JAVA_OPTS=-Xms1g -Xmx1g` |
-| NetBox 502 | `docker compose logs -f netbox` sur svc-s1 |
-| Filebeat pas de logs | `systemctl status filebeat`, mot de passe elastic, firewall S1:9200 depuis 10.0/24 VPN |
+| NetBox 502 | `docker compose logs -f netbox` sur infraservice |
+| Vault sealed | Procédure unseal (clés hors Git) |
+| Agent Wazuh absent | `systemctl status wazuh-agent`, firewall LAN |
+| Terraform plan échoue | Vérifier template `ubuntu-template` et credentials API Proxmox |
+| Ansible + Vault | Vérifier AppRole, `community.hashi_vault`, URL Vault |
+
+## 11. Diagramme soutenance
+
+Régénérer si besoin :
+
+```bash
+npx @mermaid-js/mermaid-cli -i docs/architecture-diagram.mmd -o docs/architecture-diagram.png
+```
+
+Fichier livré : [`architecture-diagram.png`](./architecture-diagram.png).

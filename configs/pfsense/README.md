@@ -1,7 +1,13 @@
 # pfSense — configuration versionnée
 
 - Exports GUI **sanitisés** : remplacer mots de passe par `REDACTED`.
-- Sinon : capture des règles NAT / firewall critiques en **tableaux Markdown** repris depuis l’interface.
-- Fichiers optionnels XML partiels hors secrets — jamais l’XML complet brut password.
+- Règles documentées en **tableaux Markdown** :
 
-Documenter WAN / LAN / VLAN et kill switch quel onglet / quelle section.
+| Site | Fichier | Trophée |
+|------|---------|---------|
+| Site 1 (on-prem) | [`site1-lan-rules.md`](./site1-lan-rules.md) | `network_firewall`, `network_spec1` |
+| Site 2 (remote) | [`site2-wan-rules.md`](./site2-wan-rules.md) | `network_firewall`, `network_vpn`, `network_spec2` |
+
+Documenter WAN / LAN / IPsec et kill switch (onglet / section pfSense).
+
+Voir [`../../docs/trophees-validation.md`](../../docs/trophees-validation.md).

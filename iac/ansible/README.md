@@ -1,41 +1,49 @@
 # Ansible — infrastructure CIA
 
+Dernière mise à jour : **23 juin 2026**.
+
 ## Playbooks
 
 | Fichier | Description |
 |---------|-------------|
 | `playbooks/site.yml` | Baseline + bastion S2 (nginx, SSH) |
-| `playbooks/deploy-site1.yml` | Docker + NetBox + Elastic sur `svc-s1` |
-| `playbooks/deploy-observability.yml` | Filebeat bastion → Elastic S1 |
-| `playbooks/netbox-sync.yml` | Sync IPAM API |
+| `playbooks/deploy-site1.yml` | Docker + NetBox + Elastic sur hôte services (legacy ELK — voir note) |
+| `playbooks/deploy-observability.yml` | Filebeat bastion → Elastic (legacy — Wazuh en prod labo) |
+| `playbooks/netbox-sync.yml` | Sync IPAM via API NetBox |
 
-## Déploiement complet
+## Hôte cible principal
+
+**`infraservice`** — `192.168.10.15` : NetBox, Vault, Wazuh, Ansible, Terraform.
+
+## Déploiement
 
 Voir [`../../docs/deploy-lab.md`](../../docs/deploy-lab.md).
 
 ```bash
 cd iac/ansible
 cp inventory/example.inventory.yml inventory/production.yml
-# Créer vault.yml avec mots de passe (hors Git)
 
-ansible-playbook -i inventory/production.yml playbooks/deploy-site1.yml -e @vault.yml
-export NETBOX_URL=http://192.168.199.20:8080 NETBOX_TOKEN=...
-ansible-playbook playbooks/netbox-sync.yml -e netbox_sync_dry_run=false -e @vault.yml
+# Secrets : vault.yml local OU HashiCorp Vault AppRole
+ansible-playbook -i inventory/production.yml playbooks/site.yml
 
-ansible-playbook -i inventory/production.yml playbooks/deploy-observability.yml -e @vault.yml
+export NETBOX_URL=http://192.168.10.15:8000 NETBOX_TOKEN=...
+ansible-playbook -i inventory/production.yml playbooks/netbox-sync.yml -e @vault.yml
 ```
 
 ## Rôles
 
-| Rôle | Cible |
-|------|-------|
-| `docker_host` | Installation Docker CE |
-| `netbox_stack` | Compose NetBox |
-| `elastic_stack` | Compose ES + Kibana |
-| `filebeat` | Agent logs bastion S2 |
-| `bastion` | Site interne nginx |
-| `netbox_sync` | Script API préfixes |
+| Rôle | Cible | Statut |
+|------|-------|--------|
+| `docker_host` | Installation Docker CE | Actif |
+| `netbox_stack` | Compose NetBox | Actif (sur infraservice) |
+| `elastic_stack` | Compose ES + Kibana | Legacy |
+| `filebeat` | Agent logs bastion S2 | Legacy (Wazuh agents en prod) |
+| `bastion` | Site interne nginx | Actif |
+| `netbox_sync` | Script API préfixes | Actif |
 
 ## Secrets
 
-`vault.yml` (gitignored) ou variables `vault_*` — jamais en clair dans Git.
+- **HashiCorp Vault** (recommandé) : AppRole Ansible, KV `infra/`
+- **Fallback** : `vault.yml` (gitignored) avec variables `vault_*`
+
+Jamais de secrets en clair dans Git.

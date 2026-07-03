@@ -1,0 +1,14 @@
+# Copier vers terraform.tfvars (gitignored) et renseigner les valeurs réelles.
+# Les credentials Proxmox sont stockés dans Vault infra/proxmox ou le coffre équipe.
+
+proxmox_api_url          = "https://192.168.102.11:8006/api2/json"
+proxmox_api_token_id     = "root@pam!terraform"
+proxmox_api_token_secret = "CHANGEME"
+proxmox_node             = "pve"
+proxmox_template         = "ubuntu-template"
+
+vm_name    = "cia-test-vm"
+vm_ip      = "192.168.10.20/24"
+vm_gateway = "192.168.10.1"
+
+vm_ssh_public_key = "ssh-ed25519 AAAA... user@laptop"

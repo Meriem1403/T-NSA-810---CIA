@@ -3,27 +3,31 @@ flowchart TB
     PUB["IP publique 78.202.114.212"]
   end
 
-  subgraph S2["Site 2 — Remote (Proxmox-01)"]
-    BOX["Box: NAT 2222→pfSense:22, UDP 1194"]
-    PFS["VM100 pfSense<br/>WAN 192.168.102.103<br/>LAN 192.168.10.1"]
+  subgraph S2["Site 2 — Remote (Proxmox 01)"]
+    BOX["Box: NAT 2222→bastion"]
+    PFS["VM100 pfSense CARP<br/>WAN 192.168.102.103<br/>LAN 192.168.10.1"]
     BAST["VM102 bastion 192.168.10.11<br/>nginx + SSH"]
     WIN["VM101 Client 192.168.10.10"]
+    INFRA["infraservice 192.168.10.15<br/>NetBox · Vault · Wazuh · Ansible"]
+    GUAC["Guacamole"]
     PUB --> BOX --> PFS
     PFS --> BAST
     PFS --> WIN
+    PFS --> INFRA
+    PFS --> GUAC
   end
 
-  subgraph VPN["OpenVPN 10.8.0.0/24"]
-    OVPN["Serveur ~10.8.0.1"]
+  subgraph VPN["VPN IPsec"]
+    IPSEC["Site-à-site + client-à-site"]
   end
 
-  subgraph S1["Site 1 — On-prem"]
+  subgraph S1["Site 1 — On-prem (Proxmox 02)"]
     FW1["pfSense 192.168.199.1"]
-    SVC["svc-s1 NetBox+Elastic .20"]
+    AD["AD mar2.local"]
     LAN1["LAN 192.168.199.0/24"]
     FW1 --- LAN1
-    LAN1 --- SVC
+    LAN1 --- AD
   end
 
-  PFS <-->|"UDP 1194"| OVPN
-  OVPN <-->|"tunnel"| FW1
+  PFS <-->|"IPsec"| IPSEC
+  IPSEC <-->|"tunnel"| FW1
