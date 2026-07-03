@@ -8,6 +8,7 @@ Document pour le trophée `proj_subdivision`.
 |--------|----------------|----------|
 | **Meriem ZAHZOUH** | Lead infra S2, doc, démo | Proxmox S2, pfSense S2, bastion, site interne, README, scénarios démo |
 | **Kévin SEMERCIYAN** | Services & IaC | InfraService, Vault, Ansible, Terraform, Wazuh, NetBox, gantt, status |
+| **Fabio TILLET** | Équipe projet | — |
 | **Équipe** | Revue & soutenance | Tests croisés, captures, présentation orale |
 
 ## Répartition par domaine

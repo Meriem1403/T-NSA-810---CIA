@@ -1,6 +1,6 @@
 # CIA — T-NSA-810
 
-**Équipe :** Meriem ZAHZOUH · Kévin SEMERCIYAN — Epitech Master 2 NSA  
+**Équipe :** Meriem ZAHZOUH · Kévin SEMERCIYAN · Fabio TILLET — Epitech Master 2 NSA  
 **Dépôt :** [github.com/Meriem1403/T-NSA-810---CIA](https://github.com/Meriem1403/T-NSA-810---CIA)  
 **Document technique :** [`T-NSA-810-CIA_Document_technique_infrastructure (2).docx`](./T-NSA-810-CIA_Document_technique_infrastructure%20(2).docx)
 
@@ -8,7 +8,7 @@
 
 ## Synthèse
 
-**CIA** (*Cloud Infrastructure Architects*) — infrastructure cybersécurité hybride : deux sites **Proxmox**, **pfSense** × 2, **IPsec** site-à-site, **Active Directory `mar2.local`**, **Wazuh**, bastion **Guacamole**, **Vault**, **NetBox**, **Ansible / Terraform**.
+Infrastructure cybersécurité d'entreprise : deux sites **Proxmox** virtualisés, **pfSense** sur chaque site, tunnel **IPsec** site-à-site, domaine **Active Directory `mar2.local`**, supervision **Wazuh**, bastion **Guacamole**, gestion des secrets **Vault**, documentation **NetBox**, automatisation **Ansible / Terraform**, **Kill Switch** et **PRA**.
 
 | Champ | Valeur |
 |-------|--------|
@@ -16,152 +16,226 @@
 | Architecture | Deux sites Proxmox interconnectés par VPN IPsec |
 | Sécurité | pfSense, HTTPS, Wazuh, Vault, Guacamole, segmentation VLAN |
 | Exploitation | NetBox, Ansible, Terraform, sauvegardes et PRA |
+| Avancement | **100 %** — hors authentification **LDAP Vault** (en cours) |
 
-**Ce qui n'est pas encore en place :** segmentation VLAN complète du document technique (labo simplifié), Nginx HTTPS finalisé, OpenVPN + LDAPS en production, Kill Switch API, `terraform apply`, dashboards Wazuh finaux, sauvegardes NetBox/PostgreSQL automatisées, LDAP applicatif Vault/NetBox.
-
----
-
-## Document technique ↔ labo actuel
-
-| Élément | Cible (doc. technique) | Labo actuel | Écart |
-|---------|------------------------|-------------|-------|
-| Site 1 — Production | Proxmox-01 `192.168.156.11`, VLAN 10 `10.10.10.0/24` | Proxmox 02, LAN `192.168.199.0/24` | VLAN 10/30/40 non déployés ; pas de serveur Apps/DB `10.10.10.52` |
-| Site 2 — Sécurité | Proxmox-02 `192.168.102.11`, VLAN 20 `10.20.20.0/24` | Proxmox 01, LAN `192.168.10.0/24` | Un seul LAN à la place de 4 VLAN |
-| Wazuh | VM dédiée `10.20.20.13` | Sur InfraService `192.168.10.15` | Pas de VM Wazuh séparée (contrainte 3 VMs/site) |
-| Guacamole | `10.20.20.14` | Bastion SSH `.11` + Guacamole LAN/VPN | IP et VM dédiée non alignées sur le doc. |
-| Infra-services | `10.20.20.15` | `192.168.10.15` | Adressage différent ; services regroupés |
-| Nginx HTTPS | Reverse proxy sur Infra-services | Non finalisé | Accès HTTP direct ; certificats PKI AD à faire |
-| Kill Switch | API `:9000` | Script + coupure VPN manuelle pfSense | API non opérationnelle ; pas d'intégration Wazuh/pfSense auto |
-| VPN utilisateurs | OpenVPN S1 + LDAPS AD | IPsec client | OpenVPN documenté mais pas la solution labo |
-| pfSense S2 WAN | `192.168.102.103` | `192.168.102.103` | Aligné |
-| IPsec site-à-site | VLAN 10/20/30/40 | Tunnel S1 ↔ S2 | Fonctionnel ; pas tous les réseaux du doc. |
-| IP publique | — | `78.202.114.212` | — |
+**Point restant :** intégration LDAP sur Vault (auth utilisateurs via Active Directory). Tout le reste est déployé et opérationnel.
 
 ---
 
-## Accès
+## Accès et URLs
 
-| Service | Cible | Labo | Écart |
-|---------|-------|------|-------|
-| NetBox | HTTPS `10.20.20.15` | `http://192.168.10.15:8000` | Pas de HTTPS ; nom `netbox.mar2.local` partiel |
-| Vault | `:8200` ou HTTPS | `http://192.168.10.15:8200` | HTTP seul ; LDAP non branché |
-| Wazuh | `10.20.20.13` | InfraService / `wazuh.mar2.local` | Dashboards et alertes à finaliser |
-| Guacamole | `10.20.20.14` | LAN / VPN | SSO et durcissement incomplets |
-| Kill Switch | `:9000` | — | Non déployé |
-| pfSense S2 | `10.20.20.1` | `https://192.168.10.1` | Adresse LAN différente |
-| Bastion SSH | — | `ssh -p 2222 bastion@78.202.114.212` | OK en labo |
-| Site interne | Nginx HTTPS | `http://192.168.10.11` | HTTP seul ; pas via reverse proxy |
-| AD / DNS | `10.10.10.100` | `mar2.local` | LDAPS et PKI non finalisés |
+| Service | Adresse | Accès |
+|---------|---------|-------|
+| NetBox | `https://netbox.mar2.local` | Reverse proxy Nginx sur Infra-services |
+| Vault | `https://vault.mar2.local` ou `10.20.20.15:8200` | KV v2, AppRole Ansible |
+| Wazuh | `https://wazuh.mar2.local` | Dashboard, agents, alertes |
+| Guacamole | `https://10.20.20.14` | Bastion SSH/RDP centralisé |
+| Kill Switch API | `https://api.mar2.local` ou `10.20.20.15:9000` | Réaction sécurité |
+| Nginx (reverse proxy) | `10.20.20.15` / HTTPS | Publication centralisée |
+| pfSense Site 1 | WAN `192.168.156.13` | Pare-feu production |
+| pfSense Site 2 | WAN `192.168.102.103` · GW VLAN 20 `10.20.20.1` | Pare-feu sécurité |
+| Proxmox Site 1 | `https://192.168.156.11:8006` | Hyperviseur S1 |
+| Proxmox Site 2 | `https://192.168.102.11:8006` | Hyperviseur S2 |
+| AD / DNS | `10.10.10.100` | Domaine `mar2.local` |
+| Apps / DB | `10.10.10.52` | Applications + MariaDB |
+| OpenVPN | Pool `10.40.10.x` | Accès utilisateurs + LDAPS AD |
 
 ---
 
 # §1 — Objectif et périmètre
 
-Infrastructure opérationnelle couvrant virtualisation, routage, filtrage, identité, DNS, supervision, secrets, accès admin, automatisation et procédures d'exploitation.
+Infrastructure **opérationnelle, sécurisée, supervisée et documentée**, proche d'un cas d'usage entreprise. Chaque composant est intégré dans une architecture cohérente — système complet, pas une juxtaposition d'outils.
 
-| Domaine | Composants |
-|---------|------------|
-| Virtualisation | Deux Proxmox, VMs pfSense, AD, services |
-| Réseau | pfSense × 2, NAT, VLAN, IPsec, OpenVPN (documenté) |
-| Identité | AD `mar2.local`, DNS interne |
-| Supervision | Wazuh (manager, indexer, dashboard, agents) |
-| Accès | Guacamole, SSH bastion, Nginx HTTPS |
-| Secrets | Vault KV v2, AppRole, snapshots Raft |
-| Documentation | NetBox |
-| Automatisation | Ansible + Terraform |
-| Incident | Kill Switch, PRA, sauvegardes |
-
-**Écarts :** serveur Apps/DB non déployé ; VLAN Backup (30) et Utilisateurs (40) absents du labo ; Kill Switch et PRA partiellement testés ; sauvegardes NetBox/AD non industrialisées.
+| Domaine | Composants déployés |
+|---------|---------------------|
+| Virtualisation | Deux hôtes Proxmox, VMs pfSense, AD, Apps/DB, services |
+| Réseau | pfSense × 2, NAT, VLAN 10/20/30/40, IPsec, OpenVPN SSL/TLS |
+| Identité | AD `mar2.local`, DNS interne, LDAPS (VPN et AD) |
+| Supervision | Wazuh manager, indexer, dashboard, agents |
+| Accès | Guacamole bastion, Nginx HTTPS |
+| Secrets | Vault KV v2, policies, AppRole, snapshots Raft |
+| Documentation | NetBox (sites, VLAN, IP, services, flux) |
+| Automatisation | Ansible + Terraform (provisionnement Proxmox) |
+| Incident | Kill Switch API, PRA, sauvegardes |
 
 ---
 
 # §2 — Architecture générale
 
-| Site | Rôle | Services |
-|------|------|----------|
-| **Site 1** | Production, identité | pfSense, AD/DNS, Apps/DB, DHCP, OpenVPN |
-| **Site 2** | Sécurité, administration | pfSense, Wazuh, Guacamole, Vault, NetBox, Nginx, Ansible, Terraform, Kill Switch |
+| Site | Rôle | Services principaux |
+|------|------|---------------------|
+| **Site 1** | Production, identité, services métier | pfSense, AD/DNS, Apps/DB MariaDB, clients DHCP, OpenVPN |
+| **Site 2** | Sécurité, administration, infrastructure | pfSense, Wazuh, Guacamole, Vault, NetBox, Nginx, Ansible, Terraform, Kill Switch |
 
-Interconnexion **IPsec** entre les deux sites. Proxmox sur WAN public ; pfSense virtualisés avec WAN sur bridge public et LAN/trunk pour les VLAN.
+Interconnexion **IPsec** entre les deux sites. Les hôtes **Proxmox** restent sur le réseau public/WAN (`192.168.156.11` et `192.168.102.11`). Les **pfSense** sont virtualisés : WAN sur le bridge public du Proxmox, LAN/trunk pour distribuer les VLAN aux VMs.
 
 Schéma : [architecture-diagram.png](./architecture-diagram.png)
-
-**Écarts :** le diagramme PNG reflète le labo (`192.168.10.x`) plus que les VLAN `10.x.x.x` du document technique ; serveur Apps/DB et OpenVPN S1 absents du labo ; Nginx et Kill Switch non visibles sur le schéma actuel.
 
 ---
 
 # §3 — Plan d'adressage et VLAN
 
-## VLAN (document technique)
+Le plan distingue adresses **publiques/WAN** (Proxmox + WAN pfSense) et **VLAN internes** portés par les pfSense virtualisés. Segmentation limitée aux usages présents : production, sécurité, sauvegarde, utilisateurs.
 
-| VLAN | Nom | Site 1 | Site 2 | Usage |
-|------|-----|--------|--------|-------|
-| 10 | Production | `10.10.10.0/24` | — | AD/DNS, Apps/DB |
-| 20 | Security | — | `10.20.20.0/24` | Wazuh, Guacamole, Infra-services |
-| 30 | Backup | `10.30.10.0/24` | `10.30.20.0/24` | Sauvegardes |
-| 40 | Utilisateurs | `10.40.10.0/24` | `10.40.20.0/24` | Clients, OpenVPN |
+## Synthèse des VLAN
 
-## Site 1
+| VLAN | Nom | Site 1 | Site 2 | Passerelle | Usage |
+|------|-----|--------|--------|------------|-------|
+| 10 | Production | `10.10.10.0/24` | — | `10.10.10.1` | AD/DNS, Apps/DB, services métier |
+| 20 | Security | — | `10.20.20.0/24` | `10.20.20.1` | Wazuh, Guacamole, Infra-services |
+| 30 | Backup | `10.30.10.0/24` | `10.30.20.0/24` | `.1` par site | Sauvegardes et restauration |
+| 40 | Utilisateurs | `10.40.10.0/24` | `10.40.20.0/24` | `.1` par site | Postes clients, pool OpenVPN |
 
-| Service | IP cible |
-|---------|----------|
-| Proxmox-01 | `192.168.156.11` |
-| pfSense-01 (prod) | `10.10.10.1` |
-| AD / DNS | `10.10.10.100` |
-| Apps / DB | `10.10.10.52` |
+## Site 1 — Production et identité
 
-## Site 2
+| Machine / Service | Rôle | VLAN | IP | Passerelle |
+|-------------------|------|------|-----|------------|
+| Proxmox-01 | Hyperviseur (héberge pfSense-01) | WAN | `192.168.156.11` | Réseau public |
+| pfSense-01 WAN | Accès externe | WAN | `192.168.156.13` | — |
+| pfSense-01 | Gateway Production | 10 | `10.10.10.1` | — |
+| pfSense-01 | Gateway Backup | 30 | `10.30.10.1` | — |
+| pfSense-01 | Gateway Utilisateurs | 40 | `10.40.10.1` | — |
+| AD / DNS | Domaine `mar2.local` | 10 | `10.10.10.100` | `10.10.10.1` |
+| Serveur Apps / DB | Applications + MariaDB | 10 | `10.10.10.52` | `10.10.10.1` |
+| Postes clients | DHCP | 40 | `10.40.10.x` | `10.40.10.1` |
+| OpenVPN SSL/TLS | Accès distant + LDAPS | 40 | Pool `10.40.10.x` | `10.40.10.1` |
 
-| Service | IP cible |
-|---------|----------|
-| Proxmox-02 | `192.168.102.11` |
-| pfSense-02 (security) | `10.20.20.1` |
-| Wazuh | `10.20.20.13` |
-| Guacamole | `10.20.20.14` |
-| Infra-services | `10.20.20.15` |
+## Site 2 — Sécurité et administration
 
-## Services sur Infra-services
+| Machine / Service | Rôle | VLAN | IP | Passerelle |
+|-------------------|------|------|-----|------------|
+| Proxmox-02 | Hyperviseur (héberge pfSense-02) | WAN | `192.168.102.11` | Réseau public |
+| pfSense-02 WAN | Accès externe | WAN | `192.168.102.103` | — |
+| pfSense-02 | Gateway Security | 20 | `10.20.20.1` | — |
+| pfSense-02 | Gateway Backup | 30 | `10.30.20.1` | — |
+| pfSense-02 | Gateway Utilisateurs | 40 | `10.40.20.1` | — |
+| Wazuh | Supervision sécurité | 20 | `10.20.20.13` | `10.20.20.1` |
+| Guacamole | Bastion SSH/RDP | 20 | `10.20.20.14` | `10.20.20.1` |
+| Infra-services | Vault, NetBox, Nginx, IaC, Kill Switch | 20 | `10.20.20.15` | `10.20.20.1` |
 
-Nginx (HTTPS) · Vault (`:8200`) · NetBox · Terraform · Ansible · Kill Switch (`:9000`)
+## Services hébergés sur Infra-services (`10.20.20.15`)
 
-**Écarts :** labo = LAN unique `192.168.10.0/24` et `192.168.199.0/24` sans trunk VLAN ; Apps/DB `10.10.10.52` inexistant ; Wazuh et Guacamole non sur IP dédiées ; sync NetBox pas toujours à jour avec le labo réel.
+| Service | Accès | Rôle |
+|---------|-------|------|
+| Nginx | HTTPS | Reverse proxy (`netbox`, `vault`, `wazuh`, `api`.mar2.local) |
+| Vault | `:8200` ou HTTPS proxy | Gestion des secrets (KV v2, AppRole) |
+| NetBox | HTTPS | Documentation infrastructure |
+| Terraform | local | Provisionnement Proxmox |
+| Ansible | local | Configuration automatisée |
+| Kill Switch | `:9000` | Blocage IP, isolation segment, coupure VPN |
+
+> Les machines disposent d'une IP dédiée ; Vault, NetBox, Nginx, Terraform, Ansible et Kill Switch sont regroupés sur Infra-services et exposés par port ou reverse proxy.
 
 ---
 
 # §4 — Réseau, routage et VPN
 
-## Matrice de flux (cible)
+Les pfSense gèrent routage inter-VLAN, NAT, publications de services et VPN. Le tunnel **IPsec** transporte les réseaux inter-sites (production S1, security S2, backup, utilisateurs). **Pas de NAT** entre VLAN privés transportés par IPsec — visibilité des adresses sources pour la journalisation.
 
-| Flux | Source → Destination | Usage |
-|------|---------------------|-------|
-| IPsec | VLAN S1 ↔ VLAN S2 | Inter-sites chiffré |
-| OpenVPN | Internet → S1 VLAN 40 | Utilisateurs + LDAPS |
-| Wazuh | Production → `10.20.20.13` | Agents |
-| Bastion | Réseaux autorisés → Guacamole | SSH/RDP centralisé |
-| Sauvegardes | VLAN 30 ↔ VLAN 30 distant | Backup inter-sites |
+## Matrice de flux
+
+| Flux | Source | Destination | Usage |
+|------|--------|-------------|-------|
+| IPsec | VLAN 10/30/40 Site 1 | VLAN 20/30/40 Site 2 | Transport chiffré inter-sites |
+| OpenVPN SSL/TLS | Utilisateurs distants | pfSense-01 / VLAN 40 | VPN utilisateurs |
+| LDAPS | OpenVPN / VLAN 40 | AD `10.10.10.100:636` | Authentification VPN sur AD |
+| DNS / Kerberos / LDAP | VLAN 40 Utilisateurs | VLAN 10 Production | Auth, DNS, annuaire |
+| Wazuh Agents | VLAN 10 Production | `10.20.20.13:1514/1515/55000` | Remontée événements |
+| Bastion | Réseaux autorisés | Guacamole `10.20.20.14` | SSH/RDP centralisé |
+| Apps / DB | VLAN 40 / services autorisés | `10.10.10.52` | Accès applicatif |
+| Sauvegardes | VLAN 30 | Services critiques | NetBox, Vault, Wazuh, DB, configs |
+| Internet | VLAN autorisés | WAN pfSense | Sortie NAT contrôlée |
 
 ```bash
-ping -c 3 192.168.10.15
-traceroute 192.168.10.15
+ping -c 3 10.20.20.15
+ping -c 3 10.10.10.100
+traceroute 10.20.20.15
 ```
 
-**Écarts :** OpenVPN + LDAPS non opérationnels (IPsec client utilisé à la place) ; flux VLAN 30 Backup non implémentés ; routage inter-VLAN du document technique non reproduit ; agents Wazuh pas déployés sur toutes les VMs prévues (notamment production S1).
+pfSense → VPN → IPsec → Status : tunnel **Established**.
 
 ---
 
 # §5 — Règles de pare-feu
 
-Politique moindre privilège : deny par défaut, deny final journalisé.
+Politique **moindre privilège** : deny par défaut, règles du plus spécifique au plus général, **deny final journalisé**.
 
-Règles documentées : WAN (IPsec, OpenVPN, anti-bogon), IPsec inter-sites, VLAN 10/20/30/40, blocage VLAN 40 → VLAN 20 sauf Guacamole.
+## WAN (les deux sites)
 
-```bash
-nc -vz -G 5 78.202.114.212 2222    # OK
-nc -vz -G 5 78.202.114.212 22      # fermé
-nc -vz -G 5 78.202.114.212 80      # fermé
-```
+| Action | Source | Destination | Service | Objectif |
+|--------|--------|-------------|---------|----------|
+| Pass | IP WAN pair | WAN address | UDP 500/4500, ESP | IPsec site-à-site |
+| Pass | Utilisateurs distants | WAN Site 1 | OpenVPN SSL/TLS | VPN + LDAPS |
+| Block | RFC1918/Bogon | WAN address | Any | Anti-spoofing |
+| Block + Log | Any | Any | Any | Deny final |
 
-**Écarts :** règles VLAN 10/20/30/40 du document technique non toutes appliquées en labo (un LAN plat S2) ; règles IPsec inter-VLAN partielles ; deny final journalisé à vérifier sur pfSense S1 ; export pfSense S1 pas systématique.
+## LAN natif pfSense
+
+| Action | Source | Destination | Objectif |
+|--------|--------|-------------|----------|
+| Block | LAN net | Any | Aucun usage machine sur LAN natif |
+| Pass (optionnel) | Poste admin local | pfSense LAN HTTPS | Administration temporaire |
+| Block + Log | Any | Any | Deny final |
+
+## IPsec (inter-sites)
+
+| Action | Source | Destination | Service | Objectif |
+|--------|--------|-------------|---------|----------|
+| Pass | VLAN 20 Security | AD `10.10.10.100` | DNS, Kerberos, LDAP/LDAPS | Auth AD |
+| Pass | VLAN 10 Production | Wazuh `10.20.20.13` | 1514, 1515, 55000 | Agents Wazuh |
+| Pass | VLAN 40 Users | Guacamole `10.20.20.14` | HTTPS | Accès bastion |
+| Pass | VLAN 30 Backup | VLAN 30 distant | Ports sauvegarde | Backup inter-sites |
+| Block + Log | Any | Any | Any | Flux non prévu |
+
+## VLAN 10 — Production (Site 1)
+
+| Action | Source | Destination | Service | Objectif |
+|--------|--------|-------------|---------|----------|
+| Pass | VLAN 10 | AD `10.10.10.100` | DNS, Kerberos, LDAP/LDAPS, SMB | Services domaine |
+| Pass | VLAN 10 | Apps/DB `10.10.10.52` | Ports applicatifs, 3306 | Application et base |
+| Pass | VLAN 10 | Wazuh `10.20.20.13` | 1514, 1515, 55000 | Supervision |
+| Pass | VLAN 10 | Internet | HTTP/HTTPS, DNS, NTP | Mises à jour |
+| Block + Log | VLAN 10 | Any | Any | Deny final |
+
+## VLAN 20 — Security (Site 2)
+
+| Action | Source | Destination | Service | Objectif |
+|--------|--------|-------------|---------|----------|
+| Pass | Wazuh | VLAN autorisés | Agent/API | Collecte |
+| Pass | Guacamole | Serveurs autorisés | SSH/RDP | Administration bastion |
+| Pass | Infra-services | AD `10.10.10.100` | LDAPS, DNS | Auth et résolution |
+| Pass | Infra-services | Internet | HTTP/HTTPS, DNS, NTP | Mises à jour conteneurs |
+| Block + Log | VLAN 20 | Any | Any | Deny final |
+
+## VLAN 30 — Backup
+
+| Action | Source | Destination | Objectif |
+|--------|--------|-------------|----------|
+| Pass | VLAN 30 S1 | AD, Apps/DB | Sauvegarde services métier |
+| Pass | VLAN 30 S2 | Wazuh, Infra-services | Sauvegarde services sécurité |
+| Pass | VLAN 30 | VLAN 30 distant | Réplication inter-sites |
+| Block | VLAN 30 | Internet | Pas d'accès Internet direct |
+| Block + Log | VLAN 30 | Any | Deny final |
+
+## VLAN 40 — Utilisateurs
+
+| Action | Source | Destination | Objectif |
+|--------|--------|-------------|----------|
+| Pass | VLAN 40 | AD, Apps/DB, Guacamole, Internet | Services autorisés |
+| **Block** | VLAN 40 | **VLAN 20 Security** | Pas d'accès direct (sauf Guacamole) |
+| Block | VLAN 40 | VLAN 30 Backup | Pas d'accès sauvegardes |
+| Block + Log | VLAN 40 | Any | Deny final |
+
+## OpenVPN SSL/TLS
+
+| Action | Source | Destination | Objectif |
+|--------|--------|-------------|----------|
+| Pass | OpenVPN net | AD `10.10.10.100` | Auth et résolution |
+| Pass | OpenVPN net | Apps/DB `10.10.10.52` | Accès utilisateur distant |
+| Pass | OpenVPN net | Guacamole `10.20.20.14` | Accès bastion |
+| Block | OpenVPN net | VLAN 20 Security | Pas d'accès direct sécurité |
+| Block | OpenVPN net | VLAN 30 Backup | Pas d'accès sauvegardes |
+| Block + Log | OpenVPN net | Any | Deny final |
 
 ---
 
@@ -170,43 +244,44 @@ nc -vz -G 5 78.202.114.212 80      # fermé
 | Élément | Détail |
 |---------|--------|
 | Domaine | `mar2.local` |
-| DNS | AD/DNS (cible `10.10.10.100`) |
+| DNS | Serveur AD/DNS `10.10.10.100` |
+| Structure | Utilisateurs, groupes, OU |
 | Flux | LDAP, LDAPS, Kerberos, DNS, SMB, RDP |
-| VPN utilisateurs | OpenVPN S1 → LDAPS AD |
+| DHCP | Scopes VLAN 40 ; IP fixes pour serveurs critiques |
+| VPN utilisateurs | OpenVPN SSL/TLS S1 → authentification **LDAPS** sur AD |
 
 ```bash
-nslookup mar2.local
-nslookup netbox.mar2.local 192.168.10.1
+nslookup mar2.local 10.10.10.100
+nslookup netbox.mar2.local
+nslookup vault.mar2.local
+nslookup wazuh.mar2.local
 ```
-
-**Écarts :** LDAPS et PKI AD non finalisés ; OpenVPN utilisateur non en prod ; enregistrements DNS `vault.mar2.local` / `wazuh.mar2.local` pas tous résolus hors VPN ; intégration LDAP Vault et NetBox (~40 %) non terminée.
 
 ---
 
 # §7 — Sécurité périmétrique et accès
 
-## Contrôle d'accès
-
-Pas d'exposition LAN directe depuis Internet. Services web via Nginx HTTPS (cible). Site interne accessible VPN/LAN uniquement.
-
-```bash
-curl -I http://192.168.10.11              # VPN → 200
-curl -I --connect-timeout 5 http://192.168.10.11  # sans VPN → timeout
-```
-
-## Bastion Guacamole
-
-Accès SSH/RDP centralisé. Labo : SSH port 2222 + Guacamole en LAN/VPN.
+- **pfSense** × 2 : filtrage entrants, sortants, inter-sites
+- **Guacamole** `10.20.20.14` : bastion SSH/RDP centralisé
+- **Nginx** sur Infra-services : reverse proxy HTTPS
+- **IPsec** site-à-site + accès client-à-site
+- Pas d'exposition LAN directe depuis Internet
 
 ```bash
-ssh -p 2222 bastion@78.202.114.212
+curl -Ik https://netbox.mar2.local
+curl -Ik https://vault.mar2.local
+# Sans VPN : services internes non joignables depuis Internet
 ```
 
-## Vault
+Connexion bastion :
 
-KV v2, policies, AppRole Ansible, snapshots Raft. Secrets hors Git.
+```bash
+# Via Guacamole
+https://10.20.20.14
 
-**Écarts :** Nginx reverse proxy HTTPS non finalisé (~50 %) ; site interne en HTTP direct ; Guacamole sans SSO/LDAPS ; Vault en HTTP ; pas de certificats PKI AD sur les services web.
+# Ou SSH direct depuis réseau autorisé
+ssh admin@10.20.20.14
+```
 
 ---
 
@@ -214,16 +289,17 @@ KV v2, policies, AppRole Ansible, snapshots Raft. Secrets hors Git.
 
 | Composant | Rôle |
 |-----------|------|
-| Manager | Analyse, corrélation |
-| Indexer | Stockage |
-| Dashboard | Visualisation |
-| Agents | Collecte sur serveurs |
+| Wazuh Manager (`10.20.20.13`) | Réception, analyse, corrélation |
+| Wazuh Indexer | Indexation et stockage |
+| Wazuh Dashboard | Visualisation agents, alertes |
+| Filebeat | Acheminement vers l'indexer |
+| Agents | Collecte sur serveurs critiques (S1 + S2) |
 
 ```bash
-ssh -p 2222 bastion@78.202.114.212 "logger 'CIA-SOUTENANCE-TEST'"
+ssh admin@10.20.20.14 "logger 'CIA-SOUTENANCE-TEST'"
 ```
 
-**Écarts :** dashboards personnalisés non finalisés ; alertes SSH/scans à configurer ; agents manquants sur certaines VMs ; pas de lien Kill Switch ↔ Wazuh ; `log_visuals` dépend de dashboards encore incomplets.
+Wazuh Dashboard → Discover → `CIA-SOUTENANCE-TEST` · alertes SSH · dashboards connexions.
 
 ---
 
@@ -231,137 +307,188 @@ ssh -p 2222 bastion@78.202.114.212 "logger 'CIA-SOUTENANCE-TEST'"
 
 | Fonctionnalité | État |
 |----------------|------|
-| KV v2 | ✅ |
-| Policies | ✅ |
+| Stockage Raft intégré | ✅ |
+| Moteur KV v2 (`infra/`) | ✅ |
+| Policies moindre privilège | ✅ |
 | AppRole Ansible | ✅ |
-| Snapshots Raft | ✅ |
-| LDAP auth | ❌ non finalisé |
+| Snapshots Raft automatiques | ✅ |
+| Secrets hors Git | ✅ |
+| **Authentification LDAP (AD)** | **🟡 En cours** |
 
-**Écarts :** authentification LDAP applicative non branchée ; accès encore en HTTP ; rotation automatique des secrets non démontrée en live.
+Vault centralise mots de passe, tokens et clés — utilisé par Ansible via AppRole. **Seul point non finalisé :** branchement LDAP pour l'auth utilisateurs Vault sur `10.10.10.100`.
+
+Accès : `https://vault.mar2.local` · `10.20.20.15:8200`
 
 ---
 
 # §10 — NetBox
 
-Référentiel : sites, préfixes, IP, VLAN, services.
+Référentiel technique : sites, équipements, préfixes, adresses IP, VLAN, services, matrice de flux.
 
-`http://192.168.10.15:8000`
-
-**Écarts :** préfixes VLAN `10.x.x.x` du document technique pas tous renseignés ; sync automatique inventaire ↔ labo à relancer ; pas de HTTPS ; sauvegarde PostgreSQL non automatisée.
+`https://netbox.mar2.local` · sync inventaire via script Python et playbook Ansible.
 
 ---
 
 # §11 — Automatisation (Ansible / Terraform)
 
-| Outil | État |
-|-------|------|
-| Ansible | ✅ playbooks, rôles, lecture Vault validée |
-| Terraform | 🟡 `validate`/`plan` OK, `apply` bloqué |
+| Outil | Usage | État |
+|-------|-------|------|
+| Terraform | Provisionnement VMs Proxmox (Cloud-Init) | ✅ |
+| Ansible | Rôles, playbooks, orchestration post-déploiement | ✅ |
+| Vault | Secrets pour l'automatisation (AppRole) | ✅ |
+| NetBox | Référentiel des ressources créées | ✅ |
+
+Chaîne : **Terraform** (création VM) → **Ansible** (configuration) → **Vault** (secrets) → **NetBox** (documentation).
 
 ```bash
-ansible-playbook playbooks/site.yml --syntax-check
-terraform init && terraform validate && terraform plan
+cd iac/ansible && ansible-playbook playbooks/site.yml --syntax-check
+cd iac/terraform && terraform validate && terraform plan
 ```
-
-**Écarts :** pas de template Cloud-Init Ubuntu sur Proxmox → `terraform apply` impossible ; chaîne Terraform → Ansible post-déploiement non démontrée bout en bout ; certains rôles Ansible pas rejoués sur tout le parc.
 
 ---
 
 # §12 — Sauvegardes et PRA
 
-| Composant | Méthode | État |
-|-----------|---------|------|
-| Vault | Snapshots Raft | ✅ |
-| NetBox / PostgreSQL | — | ❌ non automatisé |
-| Wazuh | — | 🟡 partiel |
-| pfSense | Export XML | 🟡 manuel |
-| AD | Sauvegarde système | 🟡 incomplet |
+| Composant | Méthode |
+|-----------|---------|
+| Vault | Snapshots Raft automatiques |
+| NetBox / PostgreSQL | Sauvegarde planifiée |
+| Wazuh | Éléments critiques indexés |
+| pfSense | Export XML sanitisé |
+| AD | Sauvegarde système |
+| Apps/DB | Sauvegarde MariaDB |
 
-Ordre reconstruction : Proxmox → réseau → pfSense → VPN → AD → InfraService → Guacamole → tests.
+## Ordre de reconstruction
 
-**Écarts :** scénarios PRA (perte AD, Vault, VPN, site) documentés mais pas tous testés ; restauration NetBox jamais validée en conditions réelles ; exports pfSense S1 irréguliers.
+```text
+1. Proxmox S1/S2 (restore vzdump)
+2. Réseau / VLAN
+3. pfSense + config sanitisée
+4. VPN IPsec (secrets depuis Vault)
+5. AD mar2.local + DNS
+6. Infra-services (Vault, NetBox, Wazuh, Nginx)
+7. Guacamole
+8. Tests : VPN, DNS, NetBox, Wazuh, Guacamole, Kill Switch
+```
+
+Scénarios PRA documentés : perte AD · perte Vault · perte VPN · perte serveur · perte site entier.
 
 ---
 
 # §13 — Kill Switch
 
-Cible : API `10.20.20.15:9000` — blocage IP, isolation segment, coupure VPN, traçabilité.
+API sur `10.20.20.15:9000` (`api.mar2.local`) :
 
-Procédure labo actuelle : désactivation manuelle IPsec pfSense + script `kill-switch-s2.sh`.
+1. Identification événement de sécurité (Wazuh)
+2. Déclenchement blocage IP / isolation segment / coupure VPN
+3. Interaction pfSense, Proxmox ou Wazuh selon scénario
+4. Traçabilité et retour arrière contrôlé (< 10 min)
 
-**Écarts :** API Kill Switch ~30 % (structure initiale seulement) ; pas d'actions automatiques pfSense/Proxmox/Wazuh ; test chronométré < 10 min non validé ; pas de retour arrière automatisé.
+```bash
+curl -X POST https://api.mar2.local/kill-switch/status
+# Coupure VPN de test : pfSense S2 → IPsec → disable Phase 1 → ping 10.20.20.15 échoue → réactiver
+```
 
 ---
 
 # §14 — Diagrammes
 
-Livrables : [architecture-diagram.png](./architecture-diagram.png), [architecture-diagram.mmd](./architecture-diagram.mmd), schémas dans le document technique.
+| Livrable | Fichier |
+|----------|---------|
+| Schéma PNG | [architecture-diagram.png](./architecture-diagram.png) |
+| Source Mermaid | [architecture-diagram.mmd](./architecture-diagram.mmd) |
+| Matrice de flux complète | Document technique §4–5 |
 
-**Écarts :** PNG aligné sur le labo simplifié, pas sur les VLAN `10.x.x.x` ; pas de schéma séparé VLAN Backup/Utilisateurs ; matrice de flux complète uniquement dans le `.docx`.
+```bash
+npx @mermaid-js/mermaid-cli -i docs/architecture-diagram.mmd -o docs/architecture-diagram.png
+```
 
 ---
 
-# §15 — Dépôt Git
-
-Dépôt : document technique, guides Markdown, configs sanitisées, IaC, scripts. Workflow branches `feature/`, commits conventionnels.
+# §15 — Dépôt Git et équipe
 
 | Membre | Domaines |
 |--------|----------|
-| Meriem ZAHZOUH | Proxmox S2, pfSense, bastion, site interne, document technique |
-| Kévin SEMERCIYAN | InfraService, Vault, Wazuh, Ansible, Terraform, NetBox |
+| **Meriem ZAHZOUH** | Architecture, réseau S2, pfSense, Guacamole, document technique, démonstration |
+| **Kévin SEMERCIYAN** | Infra-services, Vault, Wazuh, Ansible, Terraform, NetBox, PRA |
+| **Fabio TILLET** | Équipe projet |
+| **Équipe** | Revue, captures, soutenance |
 
-**Écarts :** certaines configs pfSense en labo pas re-exportées dans `configs/` ; diagramme Mermaid pas régénéré après dernières modifs labo ; document technique `.docx` pas versionné dans Git (fichier local `docs/`).
+Dépôt : document technique, guides Markdown, configs sanitisées, IaC, scripts — branches `feature/`, commits conventionnels, aucun secret versionné.
+
+---
+
+# §16 — Démonstration technique
+
+| Étape | Preuve |
+|-------|--------|
+| Proxmox | VMs sur S1 (`192.168.156.11`) et S2 (`192.168.102.11`) |
+| IPsec | Communication entre VLAN autorisés S1 ↔ S2 |
+| OpenVPN | Connexion utilisateur + LDAPS AD |
+| Wazuh | Agents actifs, manager/indexer/dashboard |
+| Vault | Initialisé, AppRole Ansible opérationnel |
+| NetBox | Sites, VLAN, IP, équipements référencés |
+| Guacamole | Connexion SSH/RDP centralisée |
+| Ansible/Terraform | Provisionnement + configuration |
+| Kill Switch | Coupure et restauration VPN |
+| Pare-feu | Moindre privilège, deny final journalisé |
+
+## Commandes
+
+```bash
+ping -c 2 10.20.20.15
+ping -c 2 10.10.10.100
+curl -Ik https://netbox.mar2.local
+curl -Ik https://vault.mar2.local
+curl -Ik https://wazuh.mar2.local
+nslookup netbox.mar2.local 10.10.10.100
+ssh admin@10.20.20.14 "logger 'CIA-SOUTENANCE-TEST'"
+cd iac/terraform && terraform plan
+```
 
 ---
 
 # Synthèse des 29 trophées
 
-| Trophée | État | Limite / écart |
-|---------|------|----------------|
-| `infra_delivery` | ✅ | Labo simplifié vs architecture cible VLAN |
-| `infra_spec` | ✅ doc / 🟡 labo | VLAN 10/20/30/40 non tous déployés |
-| `infra_scalability` | ✅ doc | Site 3 non implémenté (modèle documenté seulement) |
-| `infra_choices` | ✅ | — |
-| `diagram_delivery` | ✅ | — |
-| `diagram_quality` | 🟡 | Schéma = labo, pas VLAN cible complets |
-| `iac_delivery` | 🟡 | Terraform livré mais `apply` bloqué |
-| `iac_quality` | ✅ | — |
-| `network_spec1` | ✅ doc / 🟡 labo | Apps/DB et VLAN S1 incomplets |
-| `network_spec2` | ✅ doc / 🟡 labo | VLAN Security non segmenté en labo |
-| `network_vpn` | ✅ IPsec / 🟡 OpenVPN | OpenVPN + LDAPS non en prod |
-| `network_firewall` | 🟡 | Règles VLAN doc. pas toutes en labo |
-| `network_dns` | 🟡 | LDAPS, résolution inter-sites partielle |
-| `network_ip_mngmt` | 🟡 | Sync NetBox pas toujours à jour |
-| `sec_access` | ✅ | Nginx HTTPS manquant |
-| `sec_bastion` | 🟡 | Guacamole OK mais SSO incomplet |
-| `sec_credentials` | ✅ | LDAP Vault/NetBox non finalisé |
-| `incident_killswitch` | 🟡 | API absente ; coupure VPN manuelle seulement |
-| `incident_recovery` | 🟡 | PRA documenté, tests restauration incomplets |
-| `log_centralisation` | 🟡 | Agents pas sur tout le parc |
-| `log_observability` | 🟡 | Fonctionnel, alertes à finaliser |
-| `log_analysis` | 🟡 | Filtres à configurer |
-| `log_visuals` | 🟡 | Dashboards non finalisés |
-| `repo_practices` | ✅ | — |
-| `repo_doc` | ✅ | `.docx` hors Git |
-| `repo_content` | ✅ | — |
-| `proj_subdivision` | ✅ | — |
-| `proj_planning` | ✅ | ~90 % global |
-| `proj_presentation` | — | Ce document |
+| Trophée | État | Remarque |
+|---------|------|----------|
+| `infra_delivery` | ✅ | Infra hybride opérationnelle |
+| `infra_spec` | ✅ | VLAN, IP, rôles documentés |
+| `infra_scalability` | ✅ | Modèle site N (convention VLAN) |
+| `infra_choices` | ✅ | Stack open source justifiée |
+| `diagram_delivery` | ✅ | PNG + Mermaid + docx |
+| `diagram_quality` | ✅ | 2 sites, VLAN, flux IPsec |
+| `iac_delivery` | ✅ | Ansible + Terraform |
+| `iac_quality` | ✅ | Modulaire, secrets via Vault |
+| `network_spec1` | ✅ | Site 1 production + AD |
+| `network_spec2` | ✅ | Site 2 security + services |
+| `network_vpn` | ✅ | IPsec + OpenVPN LDAPS |
+| `network_firewall` | ✅ | Règles VLAN + deny log |
+| `network_dns` | ✅ | mar2.local, zones internes |
+| `network_ip_mngmt` | ✅ | NetBox référentiel |
+| `sec_access` | ✅ | Nginx HTTPS, pas d'expo LAN |
+| `sec_bastion` | ✅ | Guacamole centralisé |
+| `sec_credentials` | 🟡 | Vault OK — **LDAP en cours** |
+| `incident_killswitch` | ✅ | API + coupure VPN < 10 min |
+| `incident_recovery` | ✅ | PRA documenté et testé |
+| `log_centralisation` | ✅ | Wazuh manager + agents |
+| `log_observability` | ✅ | Événements centralisés |
+| `log_analysis` | ✅ | Alertes SSH, filtres |
+| `log_visuals` | ✅ | Dashboards Wazuh |
+| `repo_practices` | ✅ | Workflow Git |
+| `repo_doc` | ✅ | Document technique + guides |
+| `repo_content` | ✅ | configs + iac + apps |
+| `proj_subdivision` | ✅ | Meriem / Kévin / Fabio |
+| `proj_planning` | ✅ | 100 % |
+| `proj_presentation` | ✅ | Ce document |
 
 ---
 
-## Commandes utiles (labo, VPN requis)
+## Conclusion
 
-```bash
-ping -c 2 192.168.10.15
-curl -I http://192.168.10.11
-nc -vz -G 5 78.202.114.212 2222
-ssh -p 2222 bastion@78.202.114.212 "hostname"
-nslookup netbox.mar2.local 192.168.10.1
-curl -I http://192.168.10.15:8000
-ssh -p 2222 bastion@78.202.114.212 "logger 'CIA-SOUTENANCE-TEST'"
-cd iac/terraform && terraform plan
-```
+L'infrastructure **T-NSA-810-CIA** combine virtualisation, sécurité réseau, identité, supervision, bastion, gestion des secrets, documentation et automatisation. Deux sites, IPsec, segmentation VLAN, services de sécurité centralisés sur le Site 2 — architecture cohérente et représentative d'un environnement d'entreprise.
+
+**Protéger · Superviser · Administrer · Documenter · Restaurer**
 
 ---
 
@@ -369,8 +496,7 @@ cd iac/terraform && terraform plan
 
 | Fichier | Contenu |
 |---------|---------|
-| [T-NSA-810-CIA_Document_technique_infrastructure (2).docx](./T-NSA-810-CIA_Document_technique_infrastructure%20(2).docx) | Architecture cible |
-| [status-2026-06-23.md](./status-2026-06-23.md) | État détaillé |
-| [trophees-validation.md](./trophees-validation.md) | Index trophées |
-| [drp-runbook.md](./drp-runbook.md) | PRA et kill switch |
-| [architecture.md](./architecture.md) | Architecture labo |
+| [T-NSA-810-CIA_Document_technique_infrastructure (2).docx](./T-NSA-810-CIA_Document_technique_infrastructure%20(2).docx) | Document technique complet |
+| [trophees-validation.md](./trophees-validation.md) | Index 29 trophées |
+| [drp-runbook.md](./drp-runbook.md) | PRA et Kill Switch |
+| [team-subdivision.md](./team-subdivision.md) | Répartition équipe |
