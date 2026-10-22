@@ -1,162 +1,198 @@
-# T‑NSA‑810 — CIA : Infrastructure hybride sécurisée (Proxmox)
+# T-NSA-810 — CIA
 
-[![Status](https://img.shields.io/badge/status-90%25-green?style=for-the-badge)](./docs/trophees-validation.md)
-[![Infra](https://img.shields.io/badge/infra-Proxmox_|_pfSense_|_IPsec-blue?style=for-the-badge)](#pile-technique)
-[![IaC](https://img.shields.io/badge/IaC-Ansible_|_Terraform_|_Vault-green?style=for-the-badge)](./iac)
-[![Observabilité](https://img.shields.io/badge/observability-Wazuh_|_agents-purple?style=for-the-badge)](./docs/architecture.md#observabilité)
-[![Git workflow](https://img.shields.io/badge/git-workflow_conventionné-000000?style=for-the-badge&logo=git)](./docs/git-workflow.md)
+Infrastructure **hybride de laboratoire** : deux sites Proxmox reliés par IPsec, pare-feu pfSense, IPAM NetBox, secrets Vault, supervision Wazuh.
 
-Dépôt officiel du projet **Cloud Infrastructure Architects (CIA)** : deux sites Proxmox (on‑prem + distant) reliés par VPN IPsec, protégés par des pare‑feu pfSense (CARP), pilotés par un IPAM NetBox, observés via Wazuh, avec bastion d’administration, Active Directory `mar2.local`, Guacamole, gestion des secrets HashiCorp Vault, DNS inter‑sites et procédures de reprise après sinistre.
+Projet Cloud Infrastructure Architects (Epitech). Le dépôt décrit une infrastructure reproductible, pas un environnement de production exposé sur Internet.
 
-> **Trophées Epitech (29/29) :** guide complet dans [`docs/trophees-validation.md`](./docs/trophees-validation.md).
+<p align="center">
+  <img src="https://img.shields.io/badge/proxmox-E57000?logo=proxmox&logoColor=white" alt="Proxmox" />
+  <img src="https://img.shields.io/badge/pfsense-212121" alt="pfSense" />
+  <img src="https://img.shields.io/badge/ansible-EE0000?logo=ansible&logoColor=white" alt="Ansible" />
+  <img src="https://img.shields.io/badge/terraform-844FBA?logo=terraform&logoColor=white" alt="Terraform" />
+  <img src="https://img.shields.io/badge/vault-FFEC6E?logo=vault&logoColor=black" alt="Vault" />
+  <img src="https://img.shields.io/badge/wazuh-00B4C8" alt="Wazuh" />
+</p>
 
-> **État d'avancement :** voir [`docs/status-2026-06-23.md`](./docs/status-2026-06-23.md) et [`docs/gantt.md`](./docs/gantt.md) (mise à jour 23 juin 2026, ~90 %).
-
-> ℹ️ **Legacy :** l’ancien squelette **Flux / Kubernetes** est sous `legacy/flux-bootstrap/`. Les playbooks **Elastic/Filebeat** et les notes **OpenVPN** (`configs/openvpn/`, `configs/elastic/`) correspondent à une phase initiale du labo ; la supervision courante repose sur **Wazuh**.
+<p align="center">
+  <strong>Dépôt :</strong> <a href="https://github.com/Meriem1403/T-NSA-810---CIA">github.com/Meriem1403/T-NSA-810---CIA</a>
+  &nbsp;·&nbsp;
+  <strong>Suivi :</strong> <a href="./docs/trophees-validation.md">trophées</a>
+  · <a href="./docs/status-2026-06-23.md">état au 23 juin 2026</a>
+</p>
 
 ---
 
-## Objectifs pédagogiques et fonctionnels
+## Sommaire
 
-| Exigence | Où c’est traité dans le dépôt |
-|----------|-------------------------------|
-| 1 on‑prem + 1 remote Proxmox | `docs/architecture.md`, `iac/terraform/` |
-| VPN site‑à‑site sécurisé (IPsec) | `docs/architecture.md`, `docs/demo-scenarios.md` § A |
-| VPN client‑à‑site | `docs/demo-scenarios.md` § A |
-| Pare‑feu des deux côtés + kill switch | `configs/pfsense/`, `docs/drp-runbook.md`, `scripts/kill-switch-s2.sh` |
-| Bastion / accès distant contrôlé | `docs/architecture.md`, Guacamole, SSH port 2222 |
-| IPAM NetBox mis à jour automatiquement | `configs/netbox/`, `iac/ansible/` |
-| Centralisation des journaux + observabilité (Wazuh) | `docs/architecture.md`, agents Wazuh |
-| Site web **interne uniquement** | `apps/internal-site/`, nginx sur bastion S2 |
-| DNS forwarding inter‑sites | `docs/architecture.md`, domaine `mar2.local` |
-| Gestion des secrets (Vault) | `docs/secrets-and-access.md`, AppRole Ansible |
-| IaC + documentation reproductible | `iac/`, `docs/` |
+- [Présentation](#présentation)
+- [Ce que le labo couvre](#ce-que-le-labo-couvre)
+- [Pile technique](#pile-technique)
+- [Architecture](#architecture)
+- [Prérequis](#prérequis)
+- [Prise en main](#prise-en-main)
+- [Sécurité](#sécurité)
+- [Structure du projet](#structure-du-projet)
+- [Documentation](#documentation)
+- [Contribution](#contribution)
+
+---
+
+## Présentation
+
+Deux sites Proxmox (local et distant) sont reliés par un VPN IPsec. Chaque site a un pare-feu pfSense. L'adressage est tenu dans NetBox, les secrets dans Vault, les journaux dans Wazuh. Un annuaire Active Directory (`mar2.local`), un bastion et Guacamole encadrent l'administration. Un site web interne n'est joignable que depuis le labo.
+
+L'ancien squelette Kubernetes (Flux) est archivé dans `legacy/flux-bootstrap/`. Les notes Elastic/Filebeat et OpenVPN correspondent à une phase initiale : la supervision courante est Wazuh.
+
+Le détail d'avancement est dans [`docs/status-2026-06-23.md`](./docs/status-2026-06-23.md) et [`docs/gantt.md`](./docs/gantt.md).
+
+---
+
+## Ce que le labo couvre
+
+| Exigence | Où c'est traité |
+|----------|-----------------|
+| Un site local et un site distant Proxmox | `docs/architecture.md`, `iac/terraform/` |
+| VPN site à site (IPsec) et client à site | `docs/architecture.md`, `docs/demo-scenarios.md` |
+| Pare-feu des deux côtés | `configs/pfsense/`, `docs/drp-runbook.md` |
+| Bastion | `docs/architecture.md`, Guacamole |
+| IPAM NetBox mis à jour | `configs/netbox/`, `iac/ansible/` |
+| Journaux et supervision | Wazuh, `configs/wazuh/` |
+| Site interne uniquement | `apps/internal-site/` |
+| DNS entre les sites | domaine `mar2.local`, `configs/dns/` |
+| Secrets | Vault, `docs/secrets-and-access.md` |
+| Infrastructure décrite en code | `iac/` |
+
+Contrainte du sujet : au plus trois machines virtuelles par site. Les services partagés sont regroupés sur l'hôte `infraservice`.
 
 ---
 
 ## Pile technique
 
-| Couche | Technologie | État |
-|--------|-------------|------|
-| Virtualisation | Proxmox VE (2 nœuds) | ✅ |
-| Réseau / Sécurité | pfSense + CARP, IPsec, bastion SSH | ✅ |
-| Identité | Active Directory `mar2.local`, Guacamole | 🟡 LDAPS/PKI à finaliser |
-| IPAM | NetBox (Docker, API + Ansible) | ✅ |
-| Secrets | HashiCorp Vault (Raft, KV v2, AppRole) | ✅ |
-| Observabilité | Wazuh + agents | 🟡 Dashboards/alertes à finaliser |
-| Données | PostgreSQL, Valkey | ✅ |
-| IaC | Ansible, Terraform (provider Proxmox) | 🟡 `terraform apply` en attente de template |
-| Reverse proxy | Nginx + HTTPS (PKI AD) | 🟡 À finaliser |
+| Couche | Technologie | État suivi |
+|--------|-------------|------------|
+| Virtualisation | Proxmox VE, deux nœuds | En place |
+| Réseau | pfSense, CARP, IPsec, bastion SSH | En place |
+| Identité | Active Directory `mar2.local`, Guacamole | LDAPS encore à finaliser |
+| IPAM | NetBox (Docker, API, Ansible) | En place |
+| Secrets | HashiCorp Vault, Raft, KV v2, AppRole | En place |
+| Supervision | Wazuh et agents | Tableaux de bord à finaliser |
+| Données | PostgreSQL, Valkey | En place |
+| IaC | Ansible, Terraform (provider Proxmox) | `terraform apply` dépend du template |
+| Proxy | Nginx, HTTPS via la PKI de l'annuaire | À finaliser |
 
-**Hôte services centralisés :** `infraservice` — `192.168.10.15` (NetBox, Vault, Ansible, Terraform, PostgreSQL, Valkey).
+Les statuts détaillés restent ceux du document d'état, pas une promesse de production.
 
 ---
 
-## Arborescence du dépôt
+## Architecture
 
-```text
-├── README.md
-├── docs/
-│   ├── architecture.md           # Schéma, VLAN, VPN, services
-│   ├── architecture-diagram.png  # Diagramme soutenance
-│   ├── status-2026-06-23.md      # État d’avancement (Kévin)
-│   ├── gantt.md                  # Planification et backlog
-│   ├── demo-scenarios.md         # Scénarios de démonstration
-│   ├── deploy-lab.md             # Guide déploiement labo
-│   ├── drp-runbook.md            # DRP + kill switch
-│   ├── secrets-and-access.md     # Matrice d'accès et coffre
-│   ├── checklist-evaluation.md   # Grille ↔ 29 trophées
-│   └── trophees-validation.md    # Index complet trophées Epitech
-├── iac/
-│   ├── ansible/                  # Playbooks et rôles
-│   ├── docker/                   # Compose NetBox / Elastic (legacy)
-│   └── terraform/                # Provider Proxmox + module VM
-├── configs/
-│   ├── dns/                      # Forwarders mar2.local
-│   ├── pfsense/                  # Règles S1 + S2
-│   ├── netbox/                   # Scripts API IPAM
-│   ├── wazuh/                    # Supervision SIEM
-│   ├── elastic/                  # Legacy ELK / Filebeat
-│   └── openvpn/                  # Legacy phase initiale OpenVPN
-├── apps/internal-site/           # Site web interne (nginx)
-├── scripts/
-│   ├── kill-switch-s2.sh
-│   └── presentation/           # Génération PowerPoint auto
-├── docs/presentations/         # CIA-Soutenance-T-NSA-810.pptx
-└── legacy/flux-bootstrap/        # Archive GitOps Kubernetes
+```mermaid
+flowchart LR
+  subgraph site1 [Site local]
+    Pfs1[pfSense]
+    Pve1[Proxmox]
+    Pfs1 --- Pve1
+  end
+  subgraph site2 [Site distant]
+    Pfs2[pfSense]
+    Pve2[Proxmox]
+    Pfs2 --- Pve2
+  end
+  Pfs1 ---|IPsec| Pfs2
+  Pve1 --- Infra[infraservice\nNetBox Vault Wazuh]
 ```
 
+Les adresses précises du labo sont dans [`docs/architecture.md`](./docs/architecture.md). Elles ne sortent pas du réseau du projet.
+
 ---
 
-## Démarrage rapide
+## Prérequis
 
-### 1. Cloner le dépôt
+- Accès au labo Proxmox et aux pare-feu
+- **Ansible** et **Terraform**
+- **Git**
+- Un coffre pour les secrets (Vault ou `ansible-vault`), jamais le dépôt
+
+---
+
+## Prise en main
 
 ```bash
 git clone https://github.com/Meriem1403/T-NSA-810---CIA.git
 cd T-NSA-810---CIA
 ```
 
-### 2. Comprendre l’architecture
-
-1. Lire [`docs/architecture.md`](./docs/architecture.md) et [`docs/status-2026-06-23.md`](./docs/status-2026-06-23.md).
-2. Vérifier le diagramme [`docs/architecture-diagram.png`](./docs/architecture-diagram.png).
-
-### 3. Services principaux (domaine `mar2.local`)
-
-| Service | URL labo | Port |
-|---------|----------|------|
-| NetBox | `http://192.168.10.15:8000` | 8000 |
-| Vault | `http://192.168.10.15:8200` | 8200 |
-| Wazuh | `https://wazuh.mar2.local` (ou IP) | 443 |
-| Guacamole | via pfSense / LAN | — |
-| Site interne | `http://192.168.10.11` | 80 |
-
-### 4. Automatisation Ansible
+1. Lire [`docs/architecture.md`](./docs/architecture.md) et le diagramme [`docs/architecture-diagram.png`](./docs/architecture-diagram.png).
+2. Préparer l'inventaire Ansible à partir de l'exemple, sans committer l'inventaire réel :
 
 ```bash
 cd iac/ansible
 cp inventory/example.inventory.yml inventory/production.yml
-# Secrets : vault.yml local ou HashiCorp Vault AppRole (voir secrets-and-access.md)
 ansible-playbook -i inventory/production.yml playbooks/site.yml --check
 ```
 
-### 5. Terraform (Proxmox)
+3. Côté Terraform, valider le plan sans appliquer tant que le template Cloud-Init n'est pas sur Proxmox :
 
 ```bash
 cd iac/terraform
-terraform init && terraform validate && terraform plan
-# Prérequis : template Cloud-Init `ubuntu-template` sur Proxmox
+terraform init
+terraform validate
+terraform plan
 ```
 
-Guide complet : [`docs/deploy-lab.md`](./docs/deploy-lab.md).
+Le déroulé complet est [`docs/deploy-lab.md`](./docs/deploy-lab.md). La reprise après incident est [`docs/drp-runbook.md`](./docs/drp-runbook.md).
 
 ---
 
-## Contraintes sujet
+## Sécurité
 
-- **Maximum 3 VMs par site Proxmox** (services regroupés sur `infraservice` si besoin).
-- Pile **maintenue par la communauté** (Proxmox, pfSense, IPsec, NetBox, Wazuh, Vault…).
-- **Aucun secret dans Git** : coffre d’équipe + HashiCorp Vault + `ansible-vault`.
-
-Correspondances critères ↔ livrables : [`docs/checklist-evaluation.md`](./docs/checklist-evaluation.md).
-
----
-
-## Contribution (workflow Git)
-
-> Détails dans [`docs/git-workflow.md`](./docs/git-workflow.md).
-
-- Branches : `feature/<sujet>`, `fix/<sujet>`…
-- Commits au style impératif : `docs(architecture): …`, `feat(terraform): …`
-- Jamais de secrets, `*.tfstate`, `.ovpn`, tokens ou clés d’unseal dans Git.
+- Aucun secret, état Terraform, profil VPN ou clé de déverrouillage Vault dans Git.
+- Matrice d'accès : [`docs/secrets-and-access.md`](./docs/secrets-and-access.md).
+- Le site interne n'est pas publié sur Internet.
+- Les playbooks se testent d'abord avec `--check`.
 
 ---
 
-## Préparation de la soutenance
+## Structure du projet
 
-1. Valider les **29 trophées** : [`docs/trophees-validation.md`](./docs/trophees-validation.md).
-2. Suivre [`docs/demo-scenarios.md`](./docs/demo-scenarios.md) et [`docs/presentation-guide.md`](./docs/presentation-guide.md).
-3. Mettre à jour [`docs/gantt.md`](./docs/gantt.md) après chaque jalon.
-4. Joindre captures (pfSense, Wazuh, NetBox) au rapport / Excel.
-5. Vérifier que `main` reste démontrable.
+```
+T-NSA-810---CIA/
+├── docs/                  # Architecture, état, soutenance, runbooks
+├── iac/ansible/           # Playbooks et rôles
+├── iac/terraform/         # Machines Proxmox
+├── iac/docker/            # Compose NetBox
+├── configs/               # pfSense, DNS, NetBox, Wazuh
+├── apps/internal-site/    # Site joignable seulement dans le labo
+├── scripts/
+└── legacy/flux-bootstrap/ # Ancien essai Kubernetes
+```
+
+---
+
+## Documentation
+
+| Document | Contenu |
+|----------|---------|
+| [docs/architecture.md](./docs/architecture.md) | Schéma, VLAN, VPN, services |
+| [docs/deploy-lab.md](./docs/deploy-lab.md) | Déploiement du labo |
+| [docs/drp-runbook.md](./docs/drp-runbook.md) | Reprise après incident |
+| [docs/secrets-and-access.md](./docs/secrets-and-access.md) | Coffre et accès |
+| [docs/demo-scenarios.md](./docs/demo-scenarios.md) | Scénarios de démonstration |
+| [docs/git-workflow.md](./docs/git-workflow.md) | Branches et messages |
+| [docs/trophees-validation.md](./docs/trophees-validation.md) | Grille des trophées |
+| [docs/checklist-evaluation.md](./docs/checklist-evaluation.md) | Critères et livrables |
+| [docs/gantt.md](./docs/gantt.md) | Planning |
+
+---
+
+## Contribution
+
+Branches `feature/<sujet>` et `fix/<sujet>`. Messages à l'impératif, par exemple `docs(architecture): précise le VPN`. Ne pas pousser de secret. Le détail est dans [`docs/git-workflow.md`](./docs/git-workflow.md).
+
+Équipe du labo : les commits gardent leurs auteurs.
+
+---
+
+<p align="center">
+  <sub>CIA — labo Proxmox, pfSense, Vault et Wazuh. Aucun secret dans le dépôt.</sub>
+</p>
